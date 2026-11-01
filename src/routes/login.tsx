@@ -1,7 +1,12 @@
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
-import { useState } from 'react'
-import { getSupabaseBrowser } from '~/lib/supabase.browser'
+import { useEffect, useState } from 'react'
+import {
+  configureSupabaseBrowser,
+  getSupabaseBrowser,
+  isSupabaseBrowserReady,
+} from '~/lib/supabase.browser'
 import { hasSupabase } from '~/lib/env'
+import { getPublicConfig } from '~/server/public-config'
 
 export const Route = createFileRoute('/login')({
   component: LoginPage,
@@ -13,7 +18,32 @@ function LoginPage() {
   const [password, setPassword] = useState('')
   const [message, setMessage] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
-  const supabaseReady = hasSupabase()
+  const [supabaseReady, setSupabaseReady] = useState(() => hasSupabase() || isSupabaseBrowserReady())
+  const [checking, setChecking] = useState(!hasSupabase())
+
+  useEffect(() => {
+    let cancelled = false
+    async function load() {
+      try {
+        const cfg = await getPublicConfig()
+        if (cancelled) return
+        if (cfg.supabaseUrl && cfg.supabaseAnonKey) {
+          configureSupabaseBrowser(cfg.supabaseUrl, cfg.supabaseAnonKey)
+          setSupabaseReady(true)
+        } else {
+          setSupabaseReady(hasSupabase() || isSupabaseBrowserReady())
+        }
+      } catch {
+        if (!cancelled) setSupabaseReady(hasSupabase() || isSupabaseBrowserReady())
+      } finally {
+        if (!cancelled) setChecking(false)
+      }
+    }
+    void load()
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   async function onEmailAuth(e: React.FormEvent) {
     e.preventDefault()
@@ -68,9 +98,11 @@ function LoginPage() {
             Use the email and password issued by back office. Self-signup is disabled.
           </p>
 
-          {!supabaseReady && (
+          {!checking && !supabaseReady && (
             <div className="nx-callout" style={{ marginBottom: '1rem' }}>
-              Supabase is not linked yet.
+              Supabase is not linked yet. Add <code>SUPABASE_URL</code> and{' '}
+              <code>SUPABASE_ANON_KEY</code> (and matching <code>VITE_*</code>) in Vercel Environment
+              Variables, then Redeploy.
             </div>
           )}
 
@@ -104,8 +136,12 @@ function LoginPage() {
                 minLength={6}
               />
             </div>
-            <button className="nx-btn nx-btn-primary" type="submit" disabled={busy || !supabaseReady}>
-              Sign in
+            <button
+              className="nx-btn nx-btn-primary"
+              type="submit"
+              disabled={busy || checking || !supabaseReady}
+            >
+              {checking ? 'Connecting…' : 'Sign in'}
             </button>
           </form>
 
