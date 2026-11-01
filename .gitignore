@@ -1,0 +1,32 @@
+# dependencies
+node_modules/
+
+# env — never commit secrets
+.env
+.env.local
+.env.*.local
+!.env.example
+
+# build
+dist/
+.output/
+.vinxi/
+.tanstack/
+.nitro/
+.vercel/
+.netlify/
+
+# logs / OS
+*.log
+.DS_Store
+Thumbs.db
+
+# editor
+.vscode/
+.idea/
+*.swp
+
+# test / coverage
+coverage/
+count.txt
+.vercel

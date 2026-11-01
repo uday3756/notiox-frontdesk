@@ -1,0 +1,76 @@
+/**
+ * Central env access. Missing keys stay undefined — never invent secrets.
+ */
+
+function read(key: string): string | undefined {
+  const fromProcess =
+    typeof process !== 'undefined' ? process.env?.[key] : undefined
+  const fromImport =
+    typeof import.meta !== 'undefined'
+      ? (import.meta.env as Record<string, string | undefined>)?.[key]
+      : undefined
+  const value = fromProcess ?? fromImport
+  if (!value || value.startsWith('your-') || value.includes('YOUR_') || value.includes('xxxxxxxx')) {
+    return value && !value.includes('YOUR_') && !value.startsWith('your-') && !value.includes('xxxxxxxx')
+      ? value
+      : undefined
+  }
+  return value
+}
+
+/** Soft read — returns placeholder-looking values for UI copy, not for API calls */
+export function envSoft(key: string, fallback = ''): string {
+  const fromProcess =
+    typeof process !== 'undefined' ? process.env?.[key] : undefined
+  const fromImport =
+    typeof import.meta !== 'undefined'
+      ? (import.meta.env as Record<string, string | undefined>)?.[key]
+      : undefined
+  return fromProcess || fromImport || fallback
+}
+
+export const env = {
+  appUrl: () => envSoft('VITE_APP_URL') || envSoft('APP_URL') || 'http://localhost:3000',
+  appHost: () => envSoft('APP_HOST') || 'localhost:3000',
+  allowedHosts: () =>
+    (envSoft('ALLOWED_HOSTS') || 'localhost:3000,127.0.0.1:3000')
+      .split(',')
+      .map((h) => h.trim().toLowerCase())
+      .filter(Boolean),
+  notioxClientUrl: () =>
+    envSoft('VITE_NOTIOX_CLIENT_URL') ||
+    envSoft('NOTIOX_CLIENT_URL') ||
+    'https://www.notiolive.com',
+  supabaseUrl: () => read('VITE_SUPABASE_URL') || read('SUPABASE_URL'),
+  supabaseAnonKey: () => read('VITE_SUPABASE_ANON_KEY') || read('SUPABASE_ANON_KEY'),
+  supabaseServiceKey: () => read('SUPABASE_SERVICE_ROLE_KEY'),
+  supabaseAuthRedirect: () =>
+    envSoft('SUPABASE_AUTH_REDIRECT_URL') || `${envSoft('APP_URL', 'http://localhost:3000')}/auth/callback`,
+  resendApiKey: () => read('RESEND_API_KEY'),
+  resendFrom: () => envSoft('RESEND_FROM_EMAIL', 'Front Desk <noreply@example.com>'),
+  resendTestTo: () => envSoft('RESEND_TEST_TO_EMAIL'),
+  stripeSecret: () => read('STRIPE_SECRET_KEY'),
+  stripePublishable: () =>
+    read('VITE_STRIPE_PUBLISHABLE_KEY') || read('STRIPE_PUBLISHABLE_KEY'),
+  stripeWebhookSecret: () => read('STRIPE_WEBHOOK_SECRET'),
+}
+
+/** Keys required for authenticated owner data (anon + URL). Service role is optional server-only. */
+export function missingKeys(): string[] {
+  const required = [
+    ['VITE_SUPABASE_URL / SUPABASE_URL', env.supabaseUrl()],
+    ['VITE_SUPABASE_ANON_KEY / SUPABASE_ANON_KEY', env.supabaseAnonKey()],
+  ] as const
+
+  return required.filter(([, v]) => !v).map(([k]) => k)
+}
+
+/** Server-only ops (password reset, auth admin, optional client emails). */
+export function missingServerKeys(): string[] {
+  if (env.supabaseServiceKey()) return []
+  return ['SUPABASE_SERVICE_ROLE_KEY (server-only — optional for dashboard; needed for password admin)']
+}
+
+export function hasSupabase(): boolean {
+  return Boolean(env.supabaseUrl() && env.supabaseAnonKey())
+}
