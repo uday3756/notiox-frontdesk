@@ -65,8 +65,10 @@ function CalendarPage() {
           </p>
         ) : (
           <p className="nx-panel-muted" style={{ margin: 0 }}>
-            Connect Google Calendar to see events here. Add this redirect in Google Cloud:{' '}
-            <code>/auth/google-calendar</code>.
+            Connect Google Calendar to see events here. In Google Cloud → Credentials, add authorized
+            redirect URI{' '}
+            <code>https://notiox-frontdesk.vercel.app/auth/google-calendar</code>
+            {' '}(and the same path on any preview host).
           </p>
         )}
         {google.error && <p>{google.error}</p>}

@@ -30,13 +30,14 @@ export async function exchangeGoogleCode(code: string): Promise<GoogleCalendarCo
   const clientId = env.googleClientId()
   const clientSecret = env.googleClientSecret()
   if (!clientId) throw new Error('GOOGLE_CLIENT_ID is not set')
+  if (!clientSecret) throw new Error('GOOGLE_CLIENT_SECRET is not set on the server')
   const body = new URLSearchParams({
     code,
     client_id: clientId,
     redirect_uri: googleCalendarRedirectUri(),
     grant_type: 'authorization_code',
+    client_secret: clientSecret,
   })
-  if (clientSecret) body.set('client_secret', clientSecret)
   const res = await fetch('https://oauth2.googleapis.com/token', {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'User-Agent': 'notiox-frontdesk/1.0' },
