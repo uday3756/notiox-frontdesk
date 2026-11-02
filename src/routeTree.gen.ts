@@ -20,6 +20,8 @@ import { Route as TasksRouteImport } from './routes/tasks'
 import { Route as AuthCallbackRouteImport } from './routes/auth.callback'
 import { Route as ClientsIndexRouteImport } from './routes/clients.index'
 import { Route as ClientsClientIdRouteImport } from './routes/clients.$clientId'
+import { Route as EmailIndexRouteImport } from './routes/email.index'
+import { Route as EmailStudioRouteImport } from './routes/email.studio'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -76,31 +78,44 @@ const ClientsClientIdRoute = ClientsClientIdRouteImport.update({
   path: '/$clientId',
   getParentRoute: () => ClientsRoute,
 } as any)
+const EmailIndexRoute = EmailIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => EmailRoute,
+} as any)
+const EmailStudioRoute = EmailStudioRouteImport.update({
+  id: '/studio',
+  path: '/studio',
+  getParentRoute: () => EmailRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/clients': typeof ClientsRouteWithChildren
   '/codes': typeof CodesRoute
   '/dashboard': typeof DashboardRoute
-  '/email': typeof EmailRoute
+  '/email': typeof EmailRouteWithChildren
   '/login': typeof LoginRoute
   '/settings': typeof SettingsRoute
   '/tasks': typeof TasksRoute
   '/auth/callback': typeof AuthCallbackRoute
   '/clients/$clientId': typeof ClientsClientIdRoute
+  '/email/studio': typeof EmailStudioRoute
   '/clients/': typeof ClientsIndexRoute
+  '/email/': typeof EmailIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/codes': typeof CodesRoute
   '/dashboard': typeof DashboardRoute
-  '/email': typeof EmailRoute
   '/login': typeof LoginRoute
   '/settings': typeof SettingsRoute
   '/tasks': typeof TasksRoute
   '/auth/callback': typeof AuthCallbackRoute
   '/clients/$clientId': typeof ClientsClientIdRoute
+  '/email/studio': typeof EmailStudioRoute
   '/clients': typeof ClientsIndexRoute
+  '/email': typeof EmailIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -108,13 +123,15 @@ export interface FileRoutesById {
   '/clients': typeof ClientsRouteWithChildren
   '/codes': typeof CodesRoute
   '/dashboard': typeof DashboardRoute
-  '/email': typeof EmailRoute
+  '/email': typeof EmailRouteWithChildren
   '/login': typeof LoginRoute
   '/settings': typeof SettingsRoute
   '/tasks': typeof TasksRoute
   '/auth/callback': typeof AuthCallbackRoute
   '/clients/$clientId': typeof ClientsClientIdRoute
+  '/email/studio': typeof EmailStudioRoute
   '/clients/': typeof ClientsIndexRoute
+  '/email/': typeof EmailIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -129,19 +146,22 @@ export interface FileRouteTypes {
     | '/tasks'
     | '/auth/callback'
     | '/clients/$clientId'
+    | '/email/studio'
     | '/clients/'
+    | '/email/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
     | '/codes'
     | '/dashboard'
-    | '/email'
     | '/login'
     | '/settings'
     | '/tasks'
     | '/auth/callback'
     | '/clients/$clientId'
+    | '/email/studio'
     | '/clients'
+    | '/email'
   id:
     | '__root__'
     | '/'
@@ -154,7 +174,9 @@ export interface FileRouteTypes {
     | '/tasks'
     | '/auth/callback'
     | '/clients/$clientId'
+    | '/email/studio'
     | '/clients/'
+    | '/email/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -162,7 +184,7 @@ export interface RootRouteChildren {
   ClientsRoute: typeof ClientsRouteWithChildren
   CodesRoute: typeof CodesRoute
   DashboardRoute: typeof DashboardRoute
-  EmailRoute: typeof EmailRoute
+  EmailRoute: typeof EmailRouteWithChildren
   LoginRoute: typeof LoginRoute
   SettingsRoute: typeof SettingsRoute
   TasksRoute: typeof TasksRoute
@@ -248,6 +270,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ClientsClientIdRouteImport
       parentRoute: typeof ClientsRoute
     }
+    '/email/': {
+      id: '/email/'
+      path: '/'
+      fullPath: '/email/'
+      preLoaderRoute: typeof EmailIndexRouteImport
+      parentRoute: typeof EmailRoute
+    }
+    '/email/studio': {
+      id: '/email/studio'
+      path: '/studio'
+      fullPath: '/email/studio'
+      preLoaderRoute: typeof EmailStudioRouteImport
+      parentRoute: typeof EmailRoute
+    }
   }
 }
 
@@ -264,12 +300,24 @@ const ClientsRouteChildren: ClientsRouteChildren = {
 const ClientsRouteWithChildren =
   ClientsRoute._addFileChildren(ClientsRouteChildren)
 
+interface EmailRouteChildren {
+  EmailStudioRoute: typeof EmailStudioRoute
+  EmailIndexRoute: typeof EmailIndexRoute
+}
+
+const EmailRouteChildren: EmailRouteChildren = {
+  EmailStudioRoute: EmailStudioRoute,
+  EmailIndexRoute: EmailIndexRoute,
+}
+
+const EmailRouteWithChildren = EmailRoute._addFileChildren(EmailRouteChildren)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   ClientsRoute: ClientsRouteWithChildren,
   CodesRoute: CodesRoute,
   DashboardRoute: DashboardRoute,
-  EmailRoute: EmailRoute,
+  EmailRoute: EmailRouteWithChildren,
   LoginRoute: LoginRoute,
   SettingsRoute: SettingsRoute,
   TasksRoute: TasksRoute,

@@ -1,7 +1,16 @@
 import { createServerFn } from '@tanstack/react-start'
 import { z } from 'zod'
+import { wrapCampaignHtml, type EmailMedia } from '~/lib/email-html'
 import { env, hasSupabase } from '~/lib/env'
 import { loadOwnerClients, resolveOwnerFromToken } from '~/server/owner-scope'
+import { sendMailSmtp } from '~/server/smtp'
+
+const mediaInput = z.object({
+  imageUrl: z.string().optional(),
+  videoUrl: z.string().optional(),
+  linkUrl: z.string().optional(),
+  linkLabel: z.string().optional(),
+})
 
 const campaignInput = z.object({
   accessToken: z.string().min(10),
@@ -12,63 +21,38 @@ const campaignInput = z.object({
   recipientMode: z.enum(['all', 'selected']),
   recipientClientIds: z.array(z.string()).default([]),
   testToEmail: z.string().email().optional(),
+  media: mediaInput.optional(),
 })
 
-async function sendWithResend(opts: {
-  to: string | string[]
-  subject: string
-  html: string
-  text?: string
-}): Promise<{ ok: boolean; id?: string; error?: string; demo?: boolean }> {
-  const apiKey = env.resendApiKey()
-  if (!apiKey) {
-    return {
-      ok: true,
-      demo: true,
-      id: `sim_${Date.now()}`,
-      error: 'RESEND_API_KEY missing — simulated send only',
-    }
-  }
-
-  try {
-    const { Resend } = await import('resend')
-    const resend = new Resend(apiKey)
-    const result = await resend.emails.send({
-      from: env.resendFrom(),
-      to: opts.to,
-      subject: opts.subject,
-      html: opts.html,
-      text: opts.text,
-    })
-    if (result.error) {
-      return { ok: false, error: result.error.message }
-    }
-    return { ok: true, id: result.data?.id }
-  } catch (e) {
-    return { ok: false, error: e instanceof Error ? e.message : 'Send failed' }
-  }
-}
-
-function composeHtml(bodyHtml: string, extraContent?: string) {
-  if (!extraContent?.trim()) return bodyHtml
-  return `${bodyHtml}<hr style="margin:24px 0;border:none;border-top:1px solid #c5d0e0"/><div>${extraContent}</div>`
+function compose(data: z.infer<typeof campaignInput>, brand: string, sampleName?: string) {
+  const filled = sampleName
+    ? data.bodyHtml.replace(/\{\{\s*name\s*\}\}/gi, sampleName)
+    : data.bodyHtml
+  return wrapCampaignHtml({
+    brand,
+    subject: data.subject,
+    bodyHtml: filled,
+    extraContent: data.extraContent,
+    media: data.media as EmailMedia | undefined,
+  })
 }
 
 export const testSendCampaign = createServerFn({ method: 'POST' })
   .validator(campaignInput)
   .handler(async ({ data }) => {
     if (!hasSupabase()) throw new Error('Supabase is not configured')
-    await resolveOwnerFromToken(data.accessToken)
+    const ctx = await resolveOwnerFromToken(data.accessToken)
 
-    const to = data.testToEmail || env.resendTestTo()
+    const to = data.testToEmail || env.smtpTestTo()
     if (!to) {
       return {
         ok: false as const,
-        error: 'Provide testToEmail or set RESEND_TEST_TO_EMAIL',
+        error: 'Provide a test email (or set SMTP_TEST_TO).',
       }
     }
-    const html = composeHtml(data.bodyHtml, data.extraContent)
-    const result = await sendWithResend({
+    const brand = ctx.owner.brand_name || ctx.owner.full_name || 'Front Desk'
+    const html = compose(data, brand, 'there')
+    const result = await sendMailSmtp({
       to,
       subject: `[TEST] ${data.subject}`,
       html,
@@ -101,17 +85,19 @@ export const sendCampaign = createServerFn({ method: 'POST' })
     }
 
     const clients = await loadOwnerClients(ctx.doctor.id, data.accessToken)
-    const recipients =
+    const chosen =
       data.recipientMode === 'all'
-        ? clients.filter((c) => c.status === 'active').map((c) => c.email)
-        : clients.filter((c) => data.recipientClientIds.includes(c.id)).map((c) => c.email)
+        ? clients.filter((c) => c.status === 'active')
+        : clients.filter((c) => data.recipientClientIds.includes(c.id))
 
+    const recipients = chosen.map((c) => c.email).filter((e): e is string => Boolean(e))
     if (!recipients.length) {
-      return { ok: false as const, error: 'No recipients selected.' }
+      return { ok: false as const, error: 'No recipients selected (need client emails).' }
     }
 
-    const html = composeHtml(data.bodyHtml, data.extraContent)
-    const result = await sendWithResend({
+    const brand = ctx.owner.brand_name || ctx.owner.full_name || 'Front Desk'
+    const html = compose(data, brand)
+    const result = await sendMailSmtp({
       to: recipients,
       subject: data.subject,
       html,

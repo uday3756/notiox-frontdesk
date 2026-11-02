@@ -9,7 +9,7 @@ Owner console for coaches, ADHD trainers, mental health doctors, UGC creators, a
 - TanStack Start + React 19
 - Tailwind CSS v4
 - Supabase (Auth + Postgres + RLS)
-- Resend (email)
+- Email: Nodemailer SMTP (own mailbox) + AI HTML studio (optional Groq/OpenAI-compatible key)
 - Stripe (revenue — placeholder until keys exist)
 
 ## Local pipeline
@@ -32,7 +32,12 @@ npm run dev
 
 App defaults to **http://localhost:3000**.
 
-Without Supabase/Resend/Stripe keys the UI runs in **demo mode** with in-memory sample data.
+Without Supabase keys the UI cannot load owner data. Email sends simulate until SMTP is set. Stripe stays placeholder without keys.
+
+## Email
+
+- **Campaigns** (`/email`) — HTML send via **Nodemailer SMTP** (Gmail app password or clinic mailbox; same idea as [bulk-mail-cli](https://github.com/kumarabhirup/bulk-mail-cli): you pay nothing per extra API email).
+- **AI Studio** (`/email/studio`) — describe the mail, add image/video/hyperlink, generate HTML. Optional `AI_API_KEY` (Groq free OpenAI-compatible). Without a key the studio still builds a structured template.
 
 ## Migrations
 

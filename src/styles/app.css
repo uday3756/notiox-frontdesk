@@ -573,3 +573,26 @@ code {
 .nx-animate-in-delay {
   animation: nx-fade 280ms ease 40ms both;
 }
+
+.nx-subnav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin: -0.35rem 0 1rem;
+}
+
+.nx-subnav a {
+  padding: 0.38rem 0.85rem;
+  border-radius: 999px;
+  border: 1px solid var(--nx-line);
+  font-size: 0.82rem;
+  font-weight: 650;
+  color: var(--nx-slate);
+  background: #fff;
+}
+
+.nx-subnav a.active {
+  background: var(--nx-accent);
+  border-color: var(--nx-accent);
+  color: #fff;
+}

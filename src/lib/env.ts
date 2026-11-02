@@ -46,9 +46,18 @@ export const env = {
   supabaseServiceKey: () => read('SUPABASE_SERVICE_ROLE_KEY'),
   supabaseAuthRedirect: () =>
     envSoft('SUPABASE_AUTH_REDIRECT_URL') || `${envSoft('APP_URL', 'http://localhost:3000')}/auth/callback`,
-  resendApiKey: () => read('RESEND_API_KEY'),
-  resendFrom: () => envSoft('RESEND_FROM_EMAIL', 'Front Desk <noreply@example.com>'),
-  resendTestTo: () => envSoft('RESEND_TEST_TO_EMAIL'),
+  smtpHost: () => read('SMTP_HOST'),
+  smtpPort: () => Number(envSoft('SMTP_PORT', '587')) || 587,
+  smtpSecure: () => envSoft('SMTP_SECURE') === 'true',
+  smtpUser: () => read('SMTP_USER'),
+  smtpPass: () => read('SMTP_PASS'),
+  smtpFrom: () => envSoft('SMTP_FROM') || envSoft('SMTP_USER'),
+  smtpTestTo: () => read('SMTP_TEST_TO'),
+  /** OpenAI-compatible (Groq free tier: https://api.groq.com/openai/v1/chat/completions) */
+  aiApiKey: () => read('AI_API_KEY') || read('GROQ_API_KEY') || read('OPENAI_API_KEY'),
+  aiApiUrl: () =>
+    envSoft('AI_API_URL', 'https://api.groq.com/openai/v1/chat/completions'),
+  aiModel: () => envSoft('AI_MODEL', 'llama-3.1-8b-instant'),
   stripeSecret: () => read('STRIPE_SECRET_KEY'),
   stripePublishable: () =>
     read('VITE_STRIPE_PUBLISHABLE_KEY') || read('STRIPE_PUBLISHABLE_KEY'),
