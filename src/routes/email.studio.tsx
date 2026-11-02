@@ -4,6 +4,7 @@ import { useOwnerQuery } from '~/components/useOwnerQuery'
 import { EMAIL_TEMPLATE_STORAGE_KEY, wrapCampaignHtml } from '~/lib/email-html'
 import { getAccessToken } from '~/lib/session'
 import { getBootstrap, listClients } from '~/server/data'
+import { listOfferings } from '~/server/catalog'
 import { sendCampaign, testSendCampaign } from '~/server/email'
 import { generateEmailTemplate } from '~/server/email-ai'
 
@@ -21,11 +22,12 @@ function parseExtraEmails(raw: string): string[] {
 function EmailStudioPage() {
   const navigate = useNavigate()
   const fetchPage = useCallback(async (accessToken: string | undefined) => {
-    const [boot, clients] = await Promise.all([
+    const [boot, clients, offerings] = await Promise.all([
       getBootstrap({ data: { accessToken } }),
       listClients({ data: { accessToken } }),
+      listOfferings({ data: { accessToken } }),
     ])
-    return { boot, ...clients }
+    return { boot, ...clients, offerings }
   }, [])
   const state = useOwnerQuery(fetchPage, { requireAuth: true })
 
@@ -313,6 +315,56 @@ function EmailStudioPage() {
             }}
             placeholder="Button label"
           />
+          {state.status === 'ready' && state.data.offerings.offerings.length > 0 && (
+            <select
+              className="nx-select"
+              style={{ marginTop: '0.4rem' }}
+              defaultValue=""
+              onChange={(e) => {
+                const val = e.target.value
+                if (!val) return
+                const [kind, id] = val.split(':', 2)
+                if (kind === 'offering') {
+                  const link = state.data.offerings.links.find((l) => l.offeringId === id)
+                  const off = state.data.offerings.offerings.find((o) => o.id === id)
+                  if (link) {
+                    setLinkUrl(link.url)
+                    setLinkLabel(off ? `Open ${off.title}` : 'Open offering')
+                    dirty()
+                  }
+                }
+                if (kind === 'session') {
+                  const sess = state.data.offerings.sessions.find((s) => s.id === id)
+                  const off = sess
+                    ? state.data.offerings.offerings.find((o) => o.id === sess.offering_id)
+                    : undefined
+                  const link = off
+                    ? state.data.offerings.links.find((l) => l.offeringId === off.id)
+                    : undefined
+                  if (link && sess) {
+                    setLinkUrl(`${link.url}#session-${sess.id}`)
+                    setLinkLabel(sess.title)
+                    dirty()
+                  }
+                }
+              }}
+            >
+              <option value="">Attach an offering or session…</option>
+              {state.data.offerings.offerings.map((o) => (
+                <option key={o.id} value={`offering:${o.id}`}>
+                  Offering · {o.title}
+                </option>
+              ))}
+              {state.data.offerings.sessions.map((s) => {
+                const off = state.data.offerings.offerings.find((o) => o.id === s.offering_id)
+                return (
+                  <option key={s.id} value={`session:${s.id}`}>
+                    Session · {off?.title || 'Offering'} · {s.title}
+                  </option>
+                )
+              })}
+            </select>
+          )}
         </div>
         <div>
           <label className="nx-label" htmlFor="studioSubject">

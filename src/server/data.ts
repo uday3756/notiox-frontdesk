@@ -362,6 +362,10 @@ export const updateSettings = createServerFn({ method: 'POST' })
           app: blob.app,
           smtp: blob.smtp,
           audience: blob.audience,
+          offerings: blob.offerings,
+          offeringSections: blob.offeringSections,
+          offeringSessions: blob.offeringSessions,
+          googleCalendar: blob.googleCalendar,
         },
       })
     }

@@ -116,6 +116,51 @@ export interface OwnerSmtpPublic {
   hasPass: boolean
 }
 
+export type OfferingKind = 'class' | 'session' | 'meeting' | 'program' | 'other'
+
+export interface OwnerOffering {
+  id: string
+  owner_id: string
+  title: string
+  description: string | null
+  kind: OfferingKind
+  created_at: string
+  updated_at: string
+}
+
+export interface OwnerOfferingSection {
+  id: string
+  offering_id: string
+  title: string
+  description: string | null
+  created_at: string
+}
+
+export interface OwnerOfferingSession {
+  id: string
+  offering_id: string
+  section_id: string | null
+  title: string
+  starts_at: string
+  ends_at: string | null
+  location: string | null
+  meeting_url: string | null
+  google_event_id: string | null
+  created_at: string
+}
+
+export interface GoogleCalendarConnection {
+  access_token: string
+  refresh_token: string | null
+  expiry: number
+  email: string | null
+}
+
+export interface GoogleCalendarPublic {
+  connected: boolean
+  email: string | null
+}
+
 export interface OwnerTaskAssignment {
   id: string
   owner_id: string

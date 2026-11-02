@@ -8,6 +8,8 @@ const BASE_TABS = [
   { to: '/dashboard', label: 'Home', icon: IconHome },
   { to: '/clients', labelKey: 'people' as const, label: 'Clients', icon: IconPeople },
   { to: '/tasks', label: 'Tasks', icon: IconTasks },
+  { to: '/offerings', label: 'Offerings', icon: IconOffer },
+  { to: '/calendar', label: 'Calendar', icon: IconCal },
   { to: '/codes', label: 'Codes', icon: IconCode },
   { to: '/email', label: 'Email', icon: IconMail },
   { to: '/settings', label: 'Settings', icon: IconGear },
@@ -201,6 +203,28 @@ function IconGear({ active }: { active: boolean }) {
         strokeWidth={active ? 2.2 : 1.7}
         strokeLinecap="round"
       />
+    </svg>
+  )
+}
+
+function IconOffer({ active }: { active: boolean }) {
+  return (
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden>
+      <path
+        d="M4 7h16v12H4zM8 7V5h8v2"
+        stroke="currentColor"
+        strokeWidth={active ? 2.2 : 1.7}
+        strokeLinejoin="round"
+      />
+    </svg>
+  )
+}
+
+function IconCal({ active }: { active: boolean }) {
+  return (
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden>
+      <rect x="4" y="5" width="16" height="15" rx="2" stroke="currentColor" strokeWidth={active ? 2.2 : 1.7} />
+      <path d="M8 3v4M16 3v4M4 10h16" stroke="currentColor" strokeWidth={active ? 2.2 : 1.7} strokeLinecap="round" />
     </svg>
   )
 }

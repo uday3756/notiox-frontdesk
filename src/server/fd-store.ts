@@ -1,8 +1,12 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type {
   AssignmentStatus,
+  GoogleCalendarConnection,
   OwnerAppConnection,
   OwnerAudience,
+  OwnerOffering,
+  OwnerOfferingSection,
+  OwnerOfferingSession,
   OwnerSmtpConfig,
   OwnerTask,
   OwnerTaskAssignment,
@@ -21,13 +25,29 @@ export type WorkspaceBlob = {
   app?: OwnerAppConnection | null
   smtp?: OwnerSmtpConfig | null
   audience?: OwnerAudience | null
+  offerings?: OwnerOffering[]
+  offeringSections?: OwnerOfferingSection[]
+  offeringSessions?: OwnerOfferingSession[]
+  googleCalendar?: GoogleCalendarConnection | null
   bio?: string
 }
 
 type Blob = WorkspaceBlob
 
 function emptyBlob(): Blob {
-  return { topics: [], tasks: [], assignments: [], app: null, smtp: null, audience: null, bio: '' }
+  return {
+    topics: [],
+    tasks: [],
+    assignments: [],
+    app: null,
+    smtp: null,
+    audience: null,
+    offerings: [],
+    offeringSections: [],
+    offeringSessions: [],
+    googleCalendar: null,
+    bio: '',
+  }
 }
 
 export function splitDoctorNotes(notes: string | null): { bio: string; blob: Blob } {
@@ -131,6 +151,10 @@ export async function loadWorkspace(
       app,
       smtp: notesBlob.smtp ?? null,
       audience: notesBlob.audience ?? null,
+      offerings: notesBlob.offerings || [],
+      offeringSections: notesBlob.offeringSections || [],
+      offeringSessions: notesBlob.offeringSessions || [],
+      googleCalendar: notesBlob.googleCalendar ?? null,
     },
   }
 }
@@ -295,6 +319,18 @@ export async function saveSmtpConfig(
   blob.smtp = smtp
   await saveNotesBlob(db, doctorId, bio, blob)
   return smtp
+}
+
+export async function saveWorkspacePatch(
+  db: SupabaseClient,
+  doctorId: string,
+  notes: string | null,
+  patch: Partial<WorkspaceBlob>,
+): Promise<WorkspaceBlob> {
+  const { bio, blob } = splitDoctorNotes(notes)
+  Object.assign(blob, patch)
+  await saveNotesBlob(db, doctorId, bio, blob)
+  return blob
 }
 
 export async function saveAudienceConfig(

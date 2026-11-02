@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useOwnerQuery } from '~/components/useOwnerQuery'
 import { EMAIL_TEMPLATE_STORAGE_KEY, wrapCampaignHtml } from '~/lib/email-html'
 import { getAccessToken } from '~/lib/session'
+import { listOfferings } from '~/server/catalog'
 import { getBootstrap, listClients } from '~/server/data'
 import { sendCampaign, testSendCampaign } from '~/server/email'
 
@@ -12,11 +13,12 @@ export const Route = createFileRoute('/email/')({
 
 function EmailCampaignsPage() {
   const fetchPage = useCallback(async (accessToken: string | undefined) => {
-    const [clients, boot] = await Promise.all([
+    const [clients, boot, offerings] = await Promise.all([
       listClients({ data: { accessToken } }),
       getBootstrap({ data: { accessToken } }),
+      listOfferings({ data: { accessToken } }),
     ])
-    return { ...clients, boot }
+    return { ...clients, boot, offerings }
   }, [])
   const state = useOwnerQuery(fetchPage, { requireAuth: true })
   const [subject, setSubject] = useState('Weekly check-in from your coach')
@@ -265,6 +267,51 @@ function EmailCampaignsPage() {
             value={linkLabel}
             onChange={(e) => markDirty(setLinkLabel)(e.target.value)}
           />
+          {state.status === 'ready' && state.data.offerings.offerings.length > 0 && (
+            <select
+              className="nx-select"
+              style={{ marginTop: '0.4rem' }}
+              defaultValue=""
+              onChange={(e) => {
+                const val = e.target.value
+                if (!val) return
+                const [kind, id] = val.split(':', 2)
+                const pack = state.data.offerings
+                if (kind === 'offering') {
+                  const link = pack.links.find((l) => l.offeringId === id)
+                  const off = pack.offerings.find((o) => o.id === id)
+                  if (link) {
+                    markDirty(setLinkUrl)(link.url)
+                    markDirty(setLinkLabel)(off ? `Open ${off.title}` : 'Open offering')
+                  }
+                }
+                if (kind === 'session') {
+                  const sess = pack.sessions.find((s) => s.id === id)
+                  const off = sess ? pack.offerings.find((o) => o.id === sess.offering_id) : undefined
+                  const link = off ? pack.links.find((l) => l.offeringId === off.id) : undefined
+                  if (link && sess) {
+                    markDirty(setLinkUrl)(`${link.url}#session-${sess.id}`)
+                    markDirty(setLinkLabel)(sess.title)
+                  }
+                }
+              }}
+            >
+              <option value="">Attach an offering or session…</option>
+              {state.data.offerings.offerings.map((o) => (
+                <option key={o.id} value={`offering:${o.id}`}>
+                  Offering · {o.title}
+                </option>
+              ))}
+              {state.data.offerings.sessions.map((s) => {
+                const off = state.data.offerings.offerings.find((o) => o.id === s.offering_id)
+                return (
+                  <option key={s.id} value={`session:${s.id}`}>
+                    Session · {off?.title || 'Offering'} · {s.title}
+                  </option>
+                )
+              })}
+            </select>
+          )}
         </div>
         <div>
           <label className="nx-label" htmlFor="extra">

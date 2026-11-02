@@ -68,6 +68,8 @@ export const env = {
   stripePublishable: () =>
     read('VITE_STRIPE_PUBLISHABLE_KEY') || read('STRIPE_PUBLISHABLE_KEY'),
   stripeWebhookSecret: () => read('STRIPE_WEBHOOK_SECRET'),
+  googleClientId: () => read('GOOGLE_CLIENT_ID') || read('VITE_GOOGLE_CLIENT_ID'),
+  googleClientSecret: () => read('GOOGLE_CLIENT_SECRET'),
 }
 
 /** Keys required for authenticated owner data (anon + URL). Service role is optional server-only. */
