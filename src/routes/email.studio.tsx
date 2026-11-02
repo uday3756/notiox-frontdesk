@@ -1,4 +1,4 @@
-import { createFileRoute, useNavigate } from '@tanstack/react-router'
+import { Link, createFileRoute, useNavigate } from '@tanstack/react-router'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useOwnerQuery } from '~/components/useOwnerQuery'
 import { EMAIL_TEMPLATE_STORAGE_KEY, wrapCampaignHtml } from '~/lib/email-html'
@@ -148,7 +148,7 @@ function EmailStudioPage() {
         setTested(true)
         setLog(
           result.demo
-            ? `Test verified for ${result.testedTo} (simulated until SMTP is set). Bulk send unlocked.`
+            ? `Test verified for ${result.testedTo} (simulated). Save your mailbox in Settings first.`
             : `Test announcement sent to ${result.testedTo}. Bulk send unlocked.`,
         )
       }
@@ -185,7 +185,7 @@ function EmailStudioPage() {
       else {
         setLog(
           result.demo
-            ? `Bulk simulated to ${result.recipientCount} address(es). Add SMTP to deliver.`
+            ? `Bulk simulated to ${result.recipientCount} address(es). Save your mailbox in Settings to deliver.`
             : `Bulk announcement sent to ${result.recipientCount} address(es).`,
         )
       }
@@ -360,6 +360,10 @@ function EmailStudioPage() {
         <h2 className="nx-panel-title" style={{ marginTop: '0.5rem' }}>
           Send from Studio
         </h2>
+        <p className="nx-panel-muted" style={{ margin: 0 }}>
+          Sends from the mailbox you saved in <Link to="/settings">Settings</Link> (Gmail app
+          password, not your normal password).
+        </p>
         <div>
           <label className="nx-label" htmlFor="studioTestTo">
             1. Test announcement (known email)

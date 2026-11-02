@@ -10,9 +10,11 @@ import {
   insertTopic,
   loadWorkspace,
   newApiKey,
+  saveSmtpConfig,
   splitDoctorNotes,
   upsertAppConnection,
 } from '~/server/fd-store'
+import { normalizeSmtpInput, publicSmtp, sendMailSmtp } from '~/server/smtp'
 import {
   createOwnerSupabase,
   insightsFromOwnerData,
@@ -241,6 +243,7 @@ export const getSettings = createServerFn({ method: 'POST' })
       allowedHosts,
       missingKeys: missingKeys(),
       app: blob.app,
+      smtp: publicSmtp(blob.smtp),
       virtualDomain,
       storage: source,
       authenticated: true as const,
@@ -284,6 +287,7 @@ export const updateSettings = createServerFn({ method: 'POST' })
           tasks: blob.tasks,
           assignments: blob.assignments,
           app: blob.app,
+          smtp: blob.smtp,
         },
       })
     }
@@ -304,6 +308,56 @@ export const updateSettings = createServerFn({ method: 'POST' })
     }
     const refreshed = await resolveOwnerFromToken(data.accessToken)
     return { owner: refreshed.owner }
+  })
+
+export const saveSmtpSettings = createServerFn({ method: 'POST' })
+  .validator(
+    tokenInput.extend({
+      host: z.string().optional(),
+      port: z.number().int().positive().optional(),
+      secure: z.boolean().optional(),
+      user: z.string().min(1),
+      pass: z.string().optional(),
+      from: z.string().optional(),
+      testTo: z.string().optional(),
+    }),
+  )
+  .handler(async ({ data }) => {
+    if (!data.accessToken) throw new Error('Sign in required')
+    if (!hasSupabase()) throw new Error('Supabase is not configured')
+    const ctx = await resolveOwnerFromToken(data.accessToken)
+    const db = createOwnerSupabase(data.accessToken)
+    const { blob } = await loadWorkspace(db, ctx.doctor.id, ctx.doctor.notes)
+    const smtp = normalizeSmtpInput({
+      host: data.host,
+      port: data.port,
+      secure: data.secure,
+      user: data.user,
+      pass: data.pass,
+      from: data.from,
+      existing: blob.smtp,
+    })
+    if (!smtp.user.includes('@')) {
+      throw new Error('SMTP user must be your full mailbox address (e.g. you@gmail.com)')
+    }
+    if (!smtp.pass) {
+      throw new Error('Paste a Gmail app password (not your normal Gmail password)')
+    }
+    await saveSmtpConfig(db, ctx.doctor.id, ctx.doctor.notes, smtp)
+
+    let test: { ok: boolean; demo?: boolean; error?: string; id?: string } | undefined
+    const testTo = data.testTo?.trim()
+    if (testTo && testTo.includes('@')) {
+      test = await sendMailSmtp({
+        to: testTo,
+        subject: 'Front Desk mailbox test',
+        html: '<p>Your Front Desk SMTP mailbox is connected. You can send campaigns from AI Studio.</p>',
+        text: 'Your Front Desk SMTP mailbox is connected.',
+        smtp,
+      })
+    }
+
+    return { smtp: publicSmtp(smtp), test }
   })
 
 export const saveAppConnection = createServerFn({ method: 'POST' })

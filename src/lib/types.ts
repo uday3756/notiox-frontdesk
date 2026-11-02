@@ -86,6 +86,26 @@ export interface OwnerAppConnection {
   updated_at: string
 }
 
+/** Per-owner mailbox. Password stays server-side; UI never receives `pass`. */
+export interface OwnerSmtpConfig {
+  host: string
+  port: number
+  secure: boolean
+  user: string
+  pass: string
+  from: string
+}
+
+export interface OwnerSmtpPublic {
+  host: string
+  port: number
+  secure: boolean
+  user: string
+  from: string
+  configured: boolean
+  hasPass: boolean
+}
+
 export interface OwnerTaskAssignment {
   id: string
   owner_id: string

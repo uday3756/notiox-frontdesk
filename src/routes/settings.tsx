@@ -6,7 +6,7 @@ import { useOwnerQuery } from '~/components/useOwnerQuery'
 import { DNS_SETUP_STEPS } from '~/lib/hostAllowlist'
 import { getAccessToken } from '~/lib/session'
 import { ROLE_LABELS } from '~/lib/types'
-import { getSettings, saveAppConnection, updateSettings } from '~/server/data'
+import { getSettings, saveAppConnection, saveSmtpSettings, updateSettings } from '~/server/data'
 
 export const Route = createFileRoute('/settings')({
   component: SettingsPage,
@@ -26,6 +26,13 @@ function SettingsPage() {
   const [notes, setNotes] = useState('')
   const [newPassword, setNewPassword] = useState('')
   const [schoolDomain, setSchoolDomain] = useState('')
+  const [smtpHost, setSmtpHost] = useState('smtp.gmail.com')
+  const [smtpPort, setSmtpPort] = useState('587')
+  const [smtpUser, setSmtpUser] = useState('')
+  const [smtpPass, setSmtpPass] = useState('')
+  const [smtpFrom, setSmtpFrom] = useState('')
+  const [smtpTestTo, setSmtpTestTo] = useState('')
+  const [smtpHasPass, setSmtpHasPass] = useState(false)
   const [msg, setMsg] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
 
@@ -40,6 +47,14 @@ function SettingsPage() {
       setTimezone(String(s.timezone ?? ''))
       setNotes(String(s.notes ?? ''))
       setSchoolDomain(state.data.app?.school_domain || '')
+      const smtp = state.data.smtp
+      setSmtpHost(smtp?.host || 'smtp.gmail.com')
+      setSmtpPort(String(smtp?.port || 587))
+      setSmtpUser(smtp?.user || owner.email || '')
+      setSmtpFrom(smtp?.from || (owner.email ? `Front Desk <${owner.email}>` : ''))
+      setSmtpHasPass(Boolean(smtp?.hasPass))
+      setSmtpPass('')
+      if (!smtpTestTo) setSmtpTestTo(owner.email || '')
     }
   }, [state])
 
@@ -206,6 +221,144 @@ function SettingsPage() {
         </button>
         {msg && <p style={{ margin: 0 }}>{msg}</p>}
       </form>
+
+      <section className="nx-panel nx-form-grid nx-animate-in" style={{ maxWidth: 720, marginBottom: '1rem' }}>
+        <h2 className="nx-panel-title">Mailbox (SMTP)</h2>
+        <p className="nx-panel-muted" style={{ margin: 0 }}>
+          Each owner sends from their own Gmail or clinic mailbox. Use a{' '}
+          <strong>Gmail app password</strong>, not your normal Gmail password. Saved on your owner
+          record — never shown back after save.
+        </p>
+        <div style={{ display: 'grid', gap: '0.85rem', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))' }}>
+          <div>
+            <label className="nx-label" htmlFor="smtpUser">
+              SMTP user (full Gmail address)
+            </label>
+            <input
+              id="smtpUser"
+              className="nx-input"
+              type="email"
+              autoComplete="off"
+              value={smtpUser}
+              onChange={(e) => setSmtpUser(e.target.value)}
+              placeholder="you@gmail.com"
+            />
+          </div>
+          <div>
+            <label className="nx-label" htmlFor="smtpPass">
+              App password
+            </label>
+            <input
+              id="smtpPass"
+              className="nx-input"
+              type="password"
+              autoComplete="new-password"
+              value={smtpPass}
+              onChange={(e) => setSmtpPass(e.target.value)}
+              placeholder={smtpHasPass ? 'Saved — leave blank to keep' : '16-character app password'}
+            />
+          </div>
+          <div>
+            <label className="nx-label" htmlFor="smtpFrom">
+              From
+            </label>
+            <input
+              id="smtpFrom"
+              className="nx-input"
+              value={smtpFrom}
+              onChange={(e) => setSmtpFrom(e.target.value)}
+              placeholder="Front Desk <you@gmail.com>"
+            />
+          </div>
+          <div>
+            <label className="nx-label" htmlFor="smtpHost">
+              Host
+            </label>
+            <input
+              id="smtpHost"
+              className="nx-input"
+              value={smtpHost}
+              onChange={(e) => setSmtpHost(e.target.value)}
+              placeholder="smtp.gmail.com"
+            />
+          </div>
+          <div>
+            <label className="nx-label" htmlFor="smtpPort">
+              Port
+            </label>
+            <input
+              id="smtpPort"
+              className="nx-input"
+              inputMode="numeric"
+              value={smtpPort}
+              onChange={(e) => setSmtpPort(e.target.value)}
+              placeholder="587"
+            />
+          </div>
+          <div>
+            <label className="nx-label" htmlFor="smtpTestTo">
+              Send a test to (optional)
+            </label>
+            <input
+              id="smtpTestTo"
+              className="nx-input"
+              type="email"
+              value={smtpTestTo}
+              onChange={(e) => setSmtpTestTo(e.target.value)}
+            />
+          </div>
+        </div>
+        <p className="nx-panel-muted" style={{ margin: 0, fontSize: '0.85rem' }}>
+          Gmail: Google Account → Security → 2-Step Verification → App passwords. Host{' '}
+          <code>smtp.gmail.com</code>, port <code>587</code>.
+        </p>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
+          <button
+            type="button"
+            className="nx-btn nx-btn-primary"
+            disabled={busy}
+            onClick={async () => {
+              setBusy(true)
+              setMsg(null)
+              try {
+                const accessToken = (await getAccessToken()) || undefined
+                const result = await saveSmtpSettings({
+                  data: {
+                    accessToken,
+                    host: smtpHost.trim() || 'smtp.gmail.com',
+                    port: Number(smtpPort) || 587,
+                    user: smtpUser.trim(),
+                    pass: smtpPass.trim() || undefined,
+                    from: smtpFrom.trim() || undefined,
+                    testTo: smtpTestTo.trim() || undefined,
+                  },
+                })
+                setSmtpPass('')
+                setSmtpHasPass(Boolean(result.smtp.hasPass))
+                if (result.test) {
+                  if (!result.test.ok) {
+                    setMsg(result.test.error || 'Mailbox saved, but test send failed')
+                  } else if (result.test.demo) {
+                    setMsg('Mailbox saved, but send was simulated — check host, user, and app password.')
+                  } else {
+                    setMsg(`Mailbox saved. Test delivered to ${smtpTestTo}.`)
+                  }
+                } else {
+                  setMsg('Mailbox saved. AI Studio test and bulk send will use this account.')
+                }
+                await state.reload()
+              } catch (err) {
+                setMsg(err instanceof Error ? err.message : 'SMTP save failed')
+              } finally {
+                setBusy(false)
+              }
+            }}
+          >
+            Save mailbox
+          </button>
+        </div>
+        {msg && <p style={{ margin: 0 }}>{msg}</p>}
+      </section>
 
       <section className="nx-panel nx-animate-in" style={{ maxWidth: 720, marginBottom: '1rem' }}>
         <h2 className="nx-panel-title">Connect student app</h2>

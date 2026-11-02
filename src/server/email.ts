@@ -2,7 +2,8 @@ import { createServerFn } from '@tanstack/react-start'
 import { z } from 'zod'
 import { wrapCampaignHtml, type EmailMedia } from '~/lib/email-html'
 import { env, hasSupabase } from '~/lib/env'
-import { loadOwnerClients, resolveOwnerFromToken } from '~/server/owner-scope'
+import { loadWorkspace } from '~/server/fd-store'
+import { createOwnerSupabase, loadOwnerClients, resolveOwnerFromToken } from '~/server/owner-scope'
 import { sendMailSmtp } from '~/server/smtp'
 
 const mediaInput = z.object({
@@ -43,6 +44,8 @@ export const testSendCampaign = createServerFn({ method: 'POST' })
   .handler(async ({ data }) => {
     if (!hasSupabase()) throw new Error('Supabase is not configured')
     const ctx = await resolveOwnerFromToken(data.accessToken)
+    const db = createOwnerSupabase(data.accessToken)
+    const { blob } = await loadWorkspace(db, ctx.doctor.id, ctx.doctor.notes)
 
     const to = data.testToEmail || env.smtpTestTo()
     if (!to) {
@@ -58,6 +61,7 @@ export const testSendCampaign = createServerFn({ method: 'POST' })
       subject: `[TEST] ${data.subject}`,
       html,
       text: data.bodyText,
+      smtp: blob.smtp,
     })
 
     return {
@@ -78,6 +82,8 @@ export const sendCampaign = createServerFn({ method: 'POST' })
   .handler(async ({ data }) => {
     if (!hasSupabase()) throw new Error('Supabase is not configured')
     const ctx = await resolveOwnerFromToken(data.accessToken)
+    const db = createOwnerSupabase(data.accessToken)
+    const { blob } = await loadWorkspace(db, ctx.doctor.id, ctx.doctor.notes)
     if (data.requireTestFirst && !data.tested && !data.campaignId) {
       return {
         ok: false as const,
@@ -105,6 +111,7 @@ export const sendCampaign = createServerFn({ method: 'POST' })
       subject: data.subject,
       html,
       text: data.bodyText,
+      smtp: blob.smtp,
     })
 
     return {

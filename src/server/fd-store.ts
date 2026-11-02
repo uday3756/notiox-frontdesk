@@ -1,6 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type {
   OwnerAppConnection,
+  OwnerSmtpConfig,
   OwnerTask,
   OwnerTaskAssignment,
   OwnerTopic,
@@ -13,11 +14,12 @@ type Blob = {
   tasks: OwnerTask[]
   assignments: OwnerTaskAssignment[]
   app?: OwnerAppConnection | null
+  smtp?: OwnerSmtpConfig | null
   bio?: string
 }
 
 function emptyBlob(): Blob {
-  return { topics: [], tasks: [], assignments: [], app: null, bio: '' }
+  return { topics: [], tasks: [], assignments: [], app: null, smtp: null, bio: '' }
 }
 
 export function splitDoctorNotes(notes: string | null): { bio: string; blob: Blob } {
@@ -110,6 +112,7 @@ export async function loadWorkspace(
         completed_at: a.completed_at,
       })),
       app,
+      smtp: splitDoctorNotes(notes).blob.smtp ?? null,
     },
   }
 }
@@ -248,6 +251,18 @@ export async function upsertAppConnection(
   }
   if (error) throw new Error(error.message)
   return { app: conn, source: 'table' }
+}
+
+export async function saveSmtpConfig(
+  db: SupabaseClient,
+  doctorId: string,
+  notes: string | null,
+  smtp: OwnerSmtpConfig,
+): Promise<OwnerSmtpConfig> {
+  const { bio, blob } = splitDoctorNotes(notes)
+  blob.smtp = smtp
+  await saveNotesBlob(db, doctorId, bio, blob)
+  return smtp
 }
 
 export function newApiKey() {

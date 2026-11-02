@@ -32,12 +32,13 @@ npm run dev
 
 App defaults to **http://localhost:3000**.
 
-Without Supabase keys the UI cannot load owner data. Email sends simulate until SMTP is set. Stripe stays placeholder without keys.
+Without Supabase keys the UI cannot load owner data. Email sends simulate until the owner saves a mailbox in Settings. Stripe stays placeholder without keys.
 
 ## Email
 
-- **Campaigns** (`/email`) — HTML send via **Nodemailer SMTP** (Gmail app password or clinic mailbox; same idea as [bulk-mail-cli](https://github.com/kumarabhirup/bulk-mail-cli): you pay nothing per extra API email).
-- **AI Studio** (`/email/studio`) — describe the mail, add image/video/hyperlink, generate HTML. Optional `AI_API_KEY` (Groq free OpenAI-compatible). Without a key the studio still builds a structured template.
+- **Mailbox** (`/settings`) — each owner saves SMTP user (full Gmail address), a Gmail **app password** (not the normal password), and From (`Front Desk <you@gmail.com>`). Host defaults to `smtp.gmail.com:587`.
+- **Campaigns** (`/email`) — HTML send via **Nodemailer SMTP** using that owner mailbox (same idea as [bulk-mail-cli](https://github.com/kumarabhirup/bulk-mail-cli): you pay nothing per extra API email).
+- **AI Studio** (`/email/studio`) — describe the mail, add image/video/hyperlink, generate HTML, then test/bulk send. Optional `AI_API_KEY` (Groq free OpenAI-compatible). Without a key the studio still builds a structured template.
 
 ## Migrations
 
