@@ -9,9 +9,13 @@ import type {
 } from '~/lib/types'
 import { loadWorkspace, saveWorkspacePatch, splitDoctorNotes } from '~/server/fd-store'
 import {
+  decodeGoogleOAuthState,
+  encodeGoogleOAuthState,
   exchangeGoogleCode,
   googleCalendarAuthUrl,
+  googleCalendarRedirectUri,
   listGoogleEvents,
+  sanitizeOAuthOrigin,
   upsertGoogleEvent,
 } from '~/server/google-calendar'
 import { createOwnerSupabase, resolveOwnerFromToken } from '~/server/owner-scope'
@@ -286,11 +290,15 @@ export const getPublicOffering = createServerFn({ method: 'GET' })
   })
 
 export const startGoogleCalendar = createServerFn({ method: 'POST' })
-  .validator(tokenInput)
+  .validator(tokenInput.extend({ origin: z.string().url().optional() }))
   .handler(async ({ data }) => {
     if (!data.accessToken) throw new Error('Sign in required')
     const ctx = await resolveOwnerFromToken(data.accessToken)
-    return { url: googleCalendarAuthUrl(ctx.doctor.id) }
+    const origin = sanitizeOAuthOrigin(data.origin || env.appUrl())
+    return {
+      url: googleCalendarAuthUrl(encodeGoogleOAuthState(ctx.doctor.id, origin), origin),
+      redirectUri: googleCalendarRedirectUri(origin),
+    }
   })
 
 export const finishGoogleCalendar = createServerFn({ method: 'POST' })
@@ -298,8 +306,11 @@ export const finishGoogleCalendar = createServerFn({ method: 'POST' })
   .handler(async ({ data }) => {
     if (!data.accessToken) throw new Error('Sign in required')
     const ctx = await resolveOwnerFromToken(data.accessToken)
-    if (data.state !== ctx.doctor.id) throw new Error('Google Calendar state did not match this owner')
-    const conn = await exchangeGoogleCode(data.code)
+    const parsed = decodeGoogleOAuthState(data.state)
+    if (parsed.doctorId !== ctx.doctor.id) {
+      throw new Error('Google Calendar state did not match this owner')
+    }
+    const conn = await exchangeGoogleCode(data.code, parsed.origin)
     const db = createOwnerSupabase(data.accessToken)
     await saveWorkspacePatch(db, ctx.doctor.id, ctx.doctor.notes, { googleCalendar: conn })
     return { email: conn.email, connected: true as const }
@@ -351,6 +362,8 @@ export const listCalendarBoard = createServerFn({ method: 'POST' })
         connected: Boolean(google?.access_token),
         email: google?.email || null,
         configured: Boolean(env.googleClientId()),
+        hasSecret: Boolean(env.googleClientSecret()),
+        redirectUri: googleCalendarRedirectUri(env.appUrl()),
         error: googleError,
       },
       googleEvents,

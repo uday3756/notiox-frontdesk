@@ -65,10 +65,9 @@ function CalendarPage() {
           </p>
         ) : (
           <p className="nx-panel-muted" style={{ margin: 0 }}>
-            Connect Google Calendar to see events here. In Google Cloud → Credentials, add authorized
-            redirect URI{' '}
-            <code>https://notiox-frontdesk.vercel.app/auth/google-calendar</code>
-            {' '}(and the same path on any preview host).
+            Connect Google Calendar to see events here. In Google Cloud → Credentials, add this exact
+            authorized redirect URI:{' '}
+            <code>{google.redirectUri}</code>
           </p>
         )}
         {google.error && <p>{google.error}</p>}
@@ -83,7 +82,9 @@ function CalendarPage() {
                 setMsg(null)
                 try {
                   const accessToken = (await getAccessToken()) || undefined
-                  const { url } = await startGoogleCalendar({ data: { accessToken } })
+                  const { url } = await startGoogleCalendar({
+                    data: { accessToken, origin: window.location.origin },
+                  })
                   window.location.href = url
                 } catch (err) {
                   setMsg(err instanceof Error ? err.message : 'Could not start Google login')
@@ -117,7 +118,13 @@ function CalendarPage() {
           )}
         </div>
         {!google.configured && (
-          <p className="nx-panel-muted">GOOGLE_CLIENT_ID is not set on the server yet.</p>
+          <p className="nx-panel-muted">GOOGLE_CLIENT_ID is not set on the Vercel server yet.</p>
+        )}
+        {google.configured && !google.hasSecret && (
+          <p className="nx-panel-muted">
+            GOOGLE_CLIENT_SECRET is missing on Vercel (Production). Add it and redeploy, then connect
+            again.
+          </p>
         )}
       </section>
 

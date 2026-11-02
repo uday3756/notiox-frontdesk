@@ -29,11 +29,31 @@ export function envSoft(key: string, fallback = ''): string {
   return fromProcess || fromImport || fallback
 }
 
+function vercelPublicUrl(): string | undefined {
+  const prod =
+    typeof process !== 'undefined' ? process.env?.VERCEL_PROJECT_PRODUCTION_URL : undefined
+  if (prod) return `https://${prod.replace(/^https?:\/\//, '').replace(/\/$/, '')}`
+  const preview = typeof process !== 'undefined' ? process.env?.VERCEL_URL : undefined
+  if (preview) return `https://${preview.replace(/^https?:\/\//, '').replace(/\/$/, '')}`
+  return undefined
+}
+
+function isLocalHostUrl(url: string) {
+  return /localhost|127\.0\.0\.1/i.test(url)
+}
+
 export const env = {
-  appUrl: () => envSoft('VITE_APP_URL') || envSoft('APP_URL') || 'http://localhost:3000',
+  appUrl: () => {
+    const explicit = (envSoft('VITE_APP_URL') || envSoft('APP_URL') || '').replace(/\/$/, '')
+    const vercel = vercelPublicUrl()
+    if (explicit && !(vercel && isLocalHostUrl(explicit))) return explicit
+    if (vercel) return vercel
+    return explicit || 'http://localhost:3000'
+  },
   appHost: () => envSoft('APP_HOST') || 'localhost:3000',
   allowedHosts: () =>
-    (envSoft('ALLOWED_HOSTS') || 'localhost:3000,127.0.0.1:3000')
+    (envSoft('ALLOWED_HOSTS') ||
+      'localhost:3000,127.0.0.1:3000,notiox-frontdesk.vercel.app')
       .split(',')
       .map((h) => h.trim().toLowerCase())
       .filter(Boolean),

@@ -7,16 +7,47 @@ const SCOPES = [
   'https://www.googleapis.com/auth/userinfo.email',
 ].join(' ')
 
-export function googleCalendarRedirectUri() {
-  return `${env.appUrl().replace(/\/$/, '')}/auth/google-calendar`
+export function sanitizeOAuthOrigin(origin?: string) {
+  const fallback = env.appUrl().replace(/\/$/, '')
+  if (!origin) return fallback
+  let parsed: URL
+  try {
+    parsed = new URL(origin)
+  } catch {
+    return fallback
+  }
+  const host = parsed.host.toLowerCase()
+  const allowed = new Set(env.allowedHosts().map((h) => h.toLowerCase()))
+  const ok =
+    allowed.has(host) ||
+    host.endsWith('.vercel.app') ||
+    host === 'localhost:3000' ||
+    host === '127.0.0.1:3000'
+  if (!ok) return fallback
+  return `${parsed.protocol}//${parsed.host}`
 }
 
-export function googleCalendarAuthUrl(state: string) {
+export function googleCalendarRedirectUri(origin?: string) {
+  const base = sanitizeOAuthOrigin(origin)
+  return `${base}/auth/google-calendar`
+}
+
+export function encodeGoogleOAuthState(doctorId: string, origin: string) {
+  return `${doctorId}::${origin}`
+}
+
+export function decodeGoogleOAuthState(state: string): { doctorId: string; origin?: string } {
+  const idx = state.indexOf('::')
+  if (idx === -1) return { doctorId: state }
+  return { doctorId: state.slice(0, idx), origin: state.slice(idx + 2) }
+}
+
+export function googleCalendarAuthUrl(state: string, origin?: string) {
   const clientId = env.googleClientId()
   if (!clientId) throw new Error('GOOGLE_CLIENT_ID is not set')
   const params = new URLSearchParams({
     client_id: clientId,
-    redirect_uri: googleCalendarRedirectUri(),
+    redirect_uri: googleCalendarRedirectUri(origin),
     response_type: 'code',
     scope: SCOPES,
     access_type: 'offline',
@@ -26,7 +57,10 @@ export function googleCalendarAuthUrl(state: string) {
   return `https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`
 }
 
-export async function exchangeGoogleCode(code: string): Promise<GoogleCalendarConnection> {
+export async function exchangeGoogleCode(
+  code: string,
+  origin?: string,
+): Promise<GoogleCalendarConnection> {
   const clientId = env.googleClientId()
   const clientSecret = env.googleClientSecret()
   if (!clientId) throw new Error('GOOGLE_CLIENT_ID is not set')
@@ -34,7 +68,7 @@ export async function exchangeGoogleCode(code: string): Promise<GoogleCalendarCo
   const body = new URLSearchParams({
     code,
     client_id: clientId,
-    redirect_uri: googleCalendarRedirectUri(),
+    redirect_uri: googleCalendarRedirectUri(origin),
     grant_type: 'authorization_code',
     client_secret: clientSecret,
   })
