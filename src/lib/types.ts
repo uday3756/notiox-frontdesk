@@ -11,6 +11,16 @@ export type TaskPriority = 'low' | 'medium' | 'high'
 export type TaskStatus = 'open' | 'in_progress' | 'done' | 'cancelled'
 export type AssignmentStatus = 'pending' | 'in_progress' | 'completed' | 'skipped'
 
+export type WorkSignal = 'on_track' | 'needs_attention' | 'at_risk'
+
+export type AudienceKind = 'client' | 'patient' | 'student' | 'member' | 'custom'
+
+export interface OwnerAudience {
+  kind: AudienceKind
+  singular?: string
+  plural?: string
+}
+
 export type CodeType = 'promo' | 'referral' | 'invite'
 
 export type CampaignStatus =
@@ -113,6 +123,8 @@ export interface OwnerTaskAssignment {
   client_id: string
   status: AssignmentStatus
   completed_at: string | null
+  /** Owner override; null/undefined means use computed signal */
+  owner_signal?: WorkSignal | null
 }
 
 export interface EmailCampaign {

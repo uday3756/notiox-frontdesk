@@ -2,6 +2,7 @@ import { createFileRoute, Link } from '@tanstack/react-router'
 import { useCallback, useMemo, useState } from 'react'
 import { AppShell } from '~/components/AppShell'
 import { useOwnerQuery } from '~/components/useOwnerQuery'
+import { audienceLabels } from '~/lib/audience'
 import type { ClientStatus } from '~/lib/types'
 import { listClients } from '~/server/data'
 
@@ -31,10 +32,12 @@ function ClientsListPage() {
     })
   }, [state, query, status])
 
+  const people = audienceLabels(state.status === 'ready' ? state.data.audience : undefined)
+
   if (state.status === 'loading') {
     return (
       <AppShell>
-        <p style={{ color: 'var(--nx-muted)' }}>Loading clients…</p>
+        <p style={{ color: 'var(--nx-muted)' }}>Loading {people.plural}…</p>
       </AppShell>
     )
   }
@@ -55,10 +58,10 @@ function ClientsListPage() {
   }
 
   return (
-    <AppShell>
+    <AppShell peopleLabel={people.titlePlural}>
       <header className="nx-page-header nx-animate-in">
         <div>
-          <h1 className="font-display">Clients</h1>
+          <h1 className="font-display">{people.titlePlural}</h1>
           <p>
             {clients.length} from your Supabase links · showing {filtered.length}. Owner-scoped only.
           </p>
@@ -100,11 +103,11 @@ function ClientsListPage() {
       <div className="nx-panel nx-animate-in-delay">
         {clients.length === 0 ? (
           <p className="nx-panel-muted" style={{ marginBottom: 0 }}>
-            No clients linked in the database for this owner yet.
+            No {people.plural} linked in the database for this owner yet.
           </p>
         ) : filtered.length === 0 ? (
           <p className="nx-panel-muted" style={{ marginBottom: 0 }}>
-            No clients match this filter.
+            No {people.plural} match this filter.
           </p>
         ) : (
           <table className="nx-table">

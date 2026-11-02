@@ -1,10 +1,12 @@
 import { Link, useNavigate, useRouterState } from '@tanstack/react-router'
-import type { ReactNode } from 'react'
-import { signOutOwner } from '~/lib/session'
+import { useEffect, useState, type ReactNode } from 'react'
+import { audienceLabels } from '~/lib/audience'
+import { getAccessToken, signOutOwner } from '~/lib/session'
+import { getBootstrap } from '~/server/data'
 
-const TABS = [
+const BASE_TABS = [
   { to: '/dashboard', label: 'Home', icon: IconHome },
-  { to: '/clients', label: 'Clients', icon: IconPeople },
+  { to: '/clients', labelKey: 'people' as const, label: 'Clients', icon: IconPeople },
   { to: '/tasks', label: 'Tasks', icon: IconTasks },
   { to: '/codes', label: 'Codes', icon: IconCode },
   { to: '/email', label: 'Email', icon: IconMail },
@@ -20,13 +22,39 @@ export function AppShell({
   children,
   brand = 'NotioX Front Desk',
   subtitle,
+  peopleLabel,
 }: {
   children: ReactNode
   brand?: string
   subtitle?: string
+  /** Plural label for the people tab (patients, students, …). */
+  peopleLabel?: string
 }) {
   const navigate = useNavigate()
   const pathname = useRouterState({ select: (s) => s.location.pathname })
+  const [resolvedPeople, setResolvedPeople] = useState(peopleLabel || 'Clients')
+
+  useEffect(() => {
+    if (peopleLabel) {
+      setResolvedPeople(peopleLabel)
+      return
+    }
+    let cancelled = false
+    ;(async () => {
+      try {
+        const accessToken = await getAccessToken()
+        if (!accessToken || cancelled) return
+        const boot = await getBootstrap({ data: { accessToken } })
+        if (cancelled) return
+        setResolvedPeople(audienceLabels(boot.audience).titlePlural)
+      } catch {
+        /* keep default */
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [peopleLabel])
 
   async function onSignOut() {
     await signOutOwner()
@@ -48,9 +76,10 @@ export function AppShell({
       <main className="nx-main">{children}</main>
 
       <nav className="nx-tabbar" aria-label="Primary">
-        {TABS.map((tab) => {
+        {BASE_TABS.map((tab) => {
           const active = tabActive(pathname, tab.to)
           const Icon = tab.icon
+          const label = 'labelKey' in tab && tab.labelKey === 'people' ? resolvedPeople : tab.label
           return (
             <Link
               key={tab.to}
@@ -59,7 +88,7 @@ export function AppShell({
               aria-current={active ? 'page' : undefined}
             >
               <Icon active={active} />
-              <span>{tab.label}</span>
+              <span>{label}</span>
             </Link>
           )
         })}

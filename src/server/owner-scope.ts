@@ -1,7 +1,16 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 import { doctorToOwner, linkToClient, referralToCode, type DoctorRow } from '~/lib/doctor-owner'
 import { env, hasSupabase } from '~/lib/env'
-import type { DashboardInsights, Owner, OwnerClient, OwnerCode } from '~/lib/types'
+import { buildProgressBoard } from '~/lib/task-progress'
+import type {
+  DashboardInsights,
+  Owner,
+  OwnerClient,
+  OwnerCode,
+  OwnerTask,
+  OwnerTaskAssignment,
+  OwnerTopic,
+} from '~/lib/types'
 import { getSupabaseAdmin } from '~/lib/supabase.server'
 
 export type OwnerContext = {
@@ -100,21 +109,34 @@ export async function loadOwnerCodes(doctorId: string, accessToken: string): Pro
 export function insightsFromOwnerData(
   clients: OwnerClient[],
   codes: OwnerCode[],
+  workspace?: {
+    assignments: OwnerTaskAssignment[]
+    tasks: OwnerTask[]
+    topics: OwnerTopic[]
+  },
 ): DashboardInsights {
   const activeClients = clients.filter((c) => c.status === 'active').length
   const invitedClients = clients.filter((c) => c.status === 'invited').length
   const inactiveClients = clients.filter(
     (c) => c.status === 'inactive' || c.status === 'churned',
   ).length
+  const board = workspace
+    ? buildProgressBoard({
+        assignments: workspace.assignments,
+        tasks: workspace.tasks,
+        topics: workspace.topics,
+        clients,
+      })
+    : null
   return {
     totalClients: clients.length,
     activeClients,
     invitedClients,
     inactiveClients,
-    taskCompletionRate: 0,
-    openTasks: 0,
-    completedAssignments: 0,
-    totalAssignments: 0,
+    taskCompletionRate: board ? board.totals.avgCompletionRate : 0,
+    openTasks: board ? board.totals.openTasks : 0,
+    completedAssignments: board ? board.totals.completed : 0,
+    totalAssignments: board ? board.totals.assigned : 0,
     activeCodes: codes.filter((c) => c.active).length,
     revenuePlaceholder: {
       mtdCents: 0,

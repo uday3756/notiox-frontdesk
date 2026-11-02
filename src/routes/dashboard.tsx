@@ -3,6 +3,7 @@ import { useCallback } from 'react'
 import { AppShell } from '~/components/AppShell'
 import { MissingKeysBanner } from '~/components/MissingKeysBanner'
 import { useOwnerQuery } from '~/components/useOwnerQuery'
+import { audienceLabels } from '~/lib/audience'
 import { ROLE_LABELS } from '~/lib/types'
 import { getBootstrap, getDashboard } from '~/server/data'
 
@@ -39,6 +40,7 @@ function DashboardPage() {
 
   const { boot, dash } = state.data
   const { insights, codeBreakdown } = dash
+  const people = audienceLabels(dash.audience || boot.audience)
   const clientHost = boot.notioxClientUrl.replace(/^https?:\/\//, '')
   const roleLabel = ROLE_LABELS[boot.owner.role]
   const total = Math.max(
@@ -54,6 +56,7 @@ function DashboardPage() {
     <AppShell
       brand={boot.owner.brand_name || 'NotioX Front Desk'}
       subtitle={boot.owner.full_name || undefined}
+      peopleLabel={people.titlePlural}
     >
       <MissingKeysBanner keys={boot.missingKeys} />
       {'authError' in boot && boot.authError ? (
@@ -66,8 +69,8 @@ function DashboardPage() {
         <div>
           <h1 className="font-display">Insights</h1>
           <p>
-            {boot.owner.full_name || 'Owner'} · {roleLabel}. Live from Supabase — only your clients.
-            Codes redeem on{' '}
+            {boot.owner.full_name || 'Owner'} · {roleLabel}. Live from Supabase — only your{' '}
+            {people.plural}. Codes redeem on{' '}
             <a
               href={boot.notioxClientUrl}
               target="_blank"
@@ -81,7 +84,7 @@ function DashboardPage() {
         </div>
         <div className="nx-page-actions">
           <Link to="/clients" className="nx-btn nx-btn-ghost">
-            Filter clients
+            Filter {people.plural}
           </Link>
           <Link to="/codes" className="nx-btn nx-btn-primary">
             Generate code
@@ -91,7 +94,7 @@ function DashboardPage() {
 
       <div className="nx-grid-stats nx-animate-in" style={{ marginBottom: '1rem' }}>
         <div className="nx-panel nx-stat nx-insight nx-insight-teal">
-          <span>Clients</span>
+          <span>{people.titlePlural}</span>
           <strong>{insights.totalClients}</strong>
         </div>
         <div className="nx-panel nx-stat nx-insight nx-insight-blue">
@@ -107,18 +110,15 @@ function DashboardPage() {
           <strong>{insights.inactiveClients}</strong>
         </div>
         <div className="nx-panel nx-stat nx-insight nx-insight-violet">
-          <span>Active codes</span>
-          <strong>{insights.activeCodes}</strong>
+          <span>Task completion</span>
+          <strong>{Math.round(insights.taskCompletionRate * 100)}%</strong>
         </div>
         <div className="nx-panel nx-stat nx-insight nx-insight-slate">
-          <span>Revenue MTD</span>
-          <strong>
-            {(insights.revenuePlaceholder.mtdCents / 100).toLocaleString(undefined, {
-              style: 'currency',
-              currency: insights.revenuePlaceholder.currency,
-            })}
-          </strong>
-          <em>Stripe later</em>
+          <span>Open tasks</span>
+          <strong>{insights.openTasks}</strong>
+          <em>
+            {insights.completedAssignments}/{insights.totalAssignments} done
+          </em>
         </div>
       </div>
 

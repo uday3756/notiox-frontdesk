@@ -4,14 +4,18 @@ import { demoStore } from '~/lib/demo-data'
 import { hasSupabase, missingKeys } from '~/lib/env'
 import { isHostAllowed } from '~/lib/hostAllowlist'
 import { getSupabaseAdmin } from '~/lib/supabase.server'
+import { normalizeAudience } from '~/lib/audience'
+import { buildProgressBoard } from '~/lib/task-progress'
 import {
   DEFAULT_VIRTUAL_DOMAIN,
   insertTaskWithAssignments,
   insertTopic,
   loadWorkspace,
   newApiKey,
+  saveAudienceConfig,
   saveSmtpConfig,
   splitDoctorNotes,
+  updateAssignmentStatus,
   upsertAppConnection,
 } from '~/server/fd-store'
 import { normalizeSmtpInput, publicSmtp, sendMailSmtp } from '~/server/smtp'
@@ -48,7 +52,14 @@ export const getBootstrap = createServerFn({ method: 'POST' })
     if (!hasSupabase()) throw new Error('Supabase is not configured')
 
     const ctx = await resolveOwnerFromToken(data.accessToken)
-    return { ...base, owner: ctx.owner, authenticated: true as const }
+    const db = createOwnerSupabase(data.accessToken)
+    const { blob } = await loadWorkspace(db, ctx.doctor.id, ctx.doctor.notes)
+    return {
+      ...base,
+      owner: ctx.owner,
+      audience: normalizeAudience(blob.audience),
+      authenticated: true as const,
+    }
   })
 
 export const getDashboard = createServerFn({ method: 'POST' })
@@ -61,7 +72,9 @@ export const getDashboard = createServerFn({ method: 'POST' })
     if (!hasSupabase()) throw new Error('Supabase is not configured')
 
     const ctx = await resolveOwnerFromToken(data.accessToken)
-    const [clients, codes] = await Promise.all([
+    const db = createOwnerSupabase(data.accessToken)
+    const [{ blob }, clients, codes] = await Promise.all([
+      loadWorkspace(db, ctx.doctor.id, ctx.doctor.notes),
       loadOwnerClients(ctx.doctor.id, data.accessToken),
       loadOwnerCodes(ctx.doctor.id, data.accessToken),
     ])
@@ -73,9 +86,14 @@ export const getDashboard = createServerFn({ method: 'POST' })
     }
     const codeBreakdown = [...codeCounts.entries()].map(([code, count]) => ({ code, count }))
     return {
-      insights: insightsFromOwnerData(clients, codes),
+      insights: insightsFromOwnerData(clients, codes, {
+        assignments: blob.assignments,
+        tasks: blob.tasks,
+        topics: blob.topics,
+      }),
       recentClients: clients.slice(0, 8),
       codeBreakdown,
+      audience: normalizeAudience(blob.audience),
       mode: 'supabase' as const,
       authenticated: true as const,
       owner: ctx.owner,
@@ -88,8 +106,16 @@ export const listClients = createServerFn({ method: 'POST' })
     if (!data.accessToken) throw new Error('Sign in required')
     if (!hasSupabase()) throw new Error('Supabase is not configured')
     const ctx = await resolveOwnerFromToken(data.accessToken)
-    const clients = await loadOwnerClients(ctx.doctor.id, data.accessToken)
-    return { clients, authenticated: true as const }
+    const db = createOwnerSupabase(data.accessToken)
+    const [{ blob }, clients] = await Promise.all([
+      loadWorkspace(db, ctx.doctor.id, ctx.doctor.notes),
+      loadOwnerClients(ctx.doctor.id, data.accessToken),
+    ])
+    return {
+      clients,
+      audience: normalizeAudience(blob.audience),
+      authenticated: true as const,
+    }
   })
 
 export const getClient = createServerFn({ method: 'POST' })
@@ -105,7 +131,21 @@ export const getClient = createServerFn({ method: 'POST' })
     const { blob } = await loadWorkspace(db, ctx.doctor.id, ctx.doctor.notes)
     const assignments = blob.assignments.filter((a) => a.client_id === data.id)
     const tasks = blob.tasks.filter((t) => assignments.some((a) => a.task_id === t.id))
-    return { client, assignments, tasks, authenticated: true as const }
+    const progress = buildProgressBoard({
+      assignments,
+      tasks: blob.tasks,
+      topics: blob.topics,
+      clients,
+    })
+    const person = progress.people.find((p) => p.clientId === data.id) || null
+    return {
+      client,
+      assignments,
+      tasks,
+      person,
+      audience: normalizeAudience(blob.audience),
+      authenticated: true as const,
+    }
   })
 
 export const listCodes = createServerFn({ method: 'POST' })
@@ -171,14 +211,47 @@ export const listTasks = createServerFn({ method: 'POST' })
     const clients = await loadOwnerClients(ctx.doctor.id, data.accessToken)
     const db = createOwnerSupabase(data.accessToken)
     const { blob, source } = await loadWorkspace(db, ctx.doctor.id, ctx.doctor.notes)
+    const progress = buildProgressBoard({
+      assignments: blob.assignments,
+      tasks: blob.tasks,
+      topics: blob.topics,
+      clients,
+    })
     return {
       topics: blob.topics,
       tasks: blob.tasks,
       assignments: blob.assignments,
       clients,
+      progress,
+      audience: normalizeAudience(blob.audience),
       storage: source,
       authenticated: true as const,
     }
+  })
+
+export const updateAssignment = createServerFn({ method: 'POST' })
+  .validator(
+    tokenInput.extend({
+      assignmentId: z.string().min(1),
+      status: z.enum(['pending', 'in_progress', 'completed', 'skipped']).optional(),
+      ownerSignal: z.enum(['on_track', 'needs_attention', 'at_risk']).nullable().optional(),
+      clearOwnerSignal: z.boolean().optional(),
+    }),
+  )
+  .handler(async ({ data }) => {
+    if (!data.accessToken) throw new Error('Sign in required')
+    if (!hasSupabase()) throw new Error('Supabase is not configured')
+    if (!data.status && data.ownerSignal === undefined && !data.clearOwnerSignal) {
+      throw new Error('Nothing to update')
+    }
+    const ctx = await resolveOwnerFromToken(data.accessToken)
+    const db = createOwnerSupabase(data.accessToken)
+    return updateAssignmentStatus(db, ctx.doctor.id, ctx.doctor.notes, {
+      assignmentId: data.assignmentId,
+      status: data.status,
+      ownerSignal: data.ownerSignal,
+      clearOwnerSignal: data.clearOwnerSignal,
+    })
   })
 
 export const createTopic = createServerFn({ method: 'POST' })
@@ -244,6 +317,7 @@ export const getSettings = createServerFn({ method: 'POST' })
       missingKeys: missingKeys(),
       app: blob.app,
       smtp: publicSmtp(blob.smtp),
+      audience: normalizeAudience(blob.audience),
       virtualDomain,
       storage: source,
       authenticated: true as const,
@@ -287,6 +361,7 @@ export const updateSettings = createServerFn({ method: 'POST' })
           assignments: blob.assignments,
           app: blob.app,
           smtp: blob.smtp,
+          audience: blob.audience,
         },
       })
     }
@@ -317,6 +392,27 @@ export const updateSettings = createServerFn({ method: 'POST' })
     }
     const refreshed = await resolveOwnerFromToken(data.accessToken)
     return { owner: refreshed.owner }
+  })
+
+export const saveAudienceSettings = createServerFn({ method: 'POST' })
+  .validator(
+    tokenInput.extend({
+      kind: z.enum(['client', 'patient', 'student', 'member', 'custom']),
+      singular: z.string().optional(),
+      plural: z.string().optional(),
+    }),
+  )
+  .handler(async ({ data }) => {
+    if (!data.accessToken) throw new Error('Sign in required')
+    if (!hasSupabase()) throw new Error('Supabase is not configured')
+    const ctx = await resolveOwnerFromToken(data.accessToken)
+    const db = createOwnerSupabase(data.accessToken)
+    const audience = await saveAudienceConfig(db, ctx.doctor.id, ctx.doctor.notes, {
+      kind: data.kind,
+      singular: data.singular,
+      plural: data.plural,
+    })
+    return { audience: normalizeAudience(audience) }
   })
 
 export const saveSmtpSettings = createServerFn({ method: 'POST' })

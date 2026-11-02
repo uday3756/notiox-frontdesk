@@ -3,10 +3,18 @@ import { useCallback, useEffect, useState } from 'react'
 import { AppShell } from '~/components/AppShell'
 import { MissingKeysBanner } from '~/components/MissingKeysBanner'
 import { useOwnerQuery } from '~/components/useOwnerQuery'
+import { AUDIENCE_PRESET_OPTIONS, audienceLabels } from '~/lib/audience'
 import { DNS_SETUP_STEPS } from '~/lib/hostAllowlist'
 import { getAccessToken } from '~/lib/session'
+import type { AudienceKind } from '~/lib/types'
 import { ROLE_LABELS } from '~/lib/types'
-import { getSettings, saveAppConnection, saveSmtpSettings, updateSettings } from '~/server/data'
+import {
+  getSettings,
+  saveAppConnection,
+  saveAudienceSettings,
+  saveSmtpSettings,
+  updateSettings,
+} from '~/server/data'
 
 export const Route = createFileRoute('/settings')({
   component: SettingsPage,
@@ -34,6 +42,10 @@ function SettingsPage() {
   const [smtpTestTo, setSmtpTestTo] = useState('')
   const [smtpHasPass, setSmtpHasPass] = useState(false)
   const [smtpConfigured, setSmtpConfigured] = useState(false)
+  const [audienceKind, setAudienceKind] = useState<AudienceKind>('client')
+  const [audienceSingular, setAudienceSingular] = useState('')
+  const [audiencePlural, setAudiencePlural] = useState('')
+  const [audienceMsg, setAudienceMsg] = useState<string | null>(null)
   const [msg, setMsg] = useState<string | null>(null)
   const [smtpMsg, setSmtpMsg] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
@@ -58,6 +70,10 @@ function SettingsPage() {
       setSmtpConfigured(Boolean(smtp?.configured))
       setSmtpPass('')
       if (!smtpTestTo) setSmtpTestTo(owner.email || '')
+      const audience = state.data.audience
+      setAudienceKind(audience?.kind || 'client')
+      setAudienceSingular(audience?.singular || '')
+      setAudiencePlural(audience?.plural || '')
     }
   }, [state])
 
@@ -106,9 +122,10 @@ function SettingsPage() {
 
   const { owner, allowedHosts, missingKeys } = state.data
   const mustChange = Boolean(owner.settings?.password_must_change)
+  const people = audienceLabels(state.data.audience)
 
   return (
-    <AppShell>
+    <AppShell peopleLabel={people.titlePlural}>
       <MissingKeysBanner keys={missingKeys} />
       {mustChange && (
         <div className="nx-callout" style={{ marginBottom: '1rem' }}>
@@ -224,6 +241,87 @@ function SettingsPage() {
         </button>
         {msg && <p style={{ margin: 0 }}>{msg}</p>}
       </form>
+
+      <section className="nx-panel nx-form-grid nx-animate-in" style={{ maxWidth: 720, marginBottom: '1rem' }}>
+        <h2 className="nx-panel-title">How you refer to people</h2>
+        <p className="nx-panel-muted" style={{ margin: 0 }}>
+          Used lightly in navigation and progress views — patient, student, client, or your own words.
+        </p>
+        <div>
+          <label className="nx-label" htmlFor="audienceKind">
+            Wording
+          </label>
+          <select
+            id="audienceKind"
+            className="nx-select"
+            value={audienceKind}
+            onChange={(e) => setAudienceKind(e.target.value as AudienceKind)}
+          >
+            {AUDIENCE_PRESET_OPTIONS.map((opt) => (
+              <option key={opt.value} value={opt.value}>
+                {opt.label}
+              </option>
+            ))}
+          </select>
+        </div>
+        {audienceKind === 'custom' && (
+          <div style={{ display: 'grid', gap: '0.85rem', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))' }}>
+            <div>
+              <label className="nx-label" htmlFor="audienceSingular">
+                Singular
+              </label>
+              <input
+                id="audienceSingular"
+                className="nx-input"
+                value={audienceSingular}
+                onChange={(e) => setAudienceSingular(e.target.value)}
+                placeholder="client"
+              />
+            </div>
+            <div>
+              <label className="nx-label" htmlFor="audiencePlural">
+                Plural
+              </label>
+              <input
+                id="audiencePlural"
+                className="nx-input"
+                value={audiencePlural}
+                onChange={(e) => setAudiencePlural(e.target.value)}
+                placeholder="clients"
+              />
+            </div>
+          </div>
+        )}
+        <button
+          type="button"
+          className="nx-btn nx-btn-ghost"
+          disabled={busy}
+          onClick={async () => {
+            setBusy(true)
+            setAudienceMsg(null)
+            try {
+              const accessToken = (await getAccessToken()) || undefined
+              await saveAudienceSettings({
+                data: {
+                  accessToken,
+                  kind: audienceKind,
+                  singular: audienceSingular || undefined,
+                  plural: audiencePlural || undefined,
+                },
+              })
+              setAudienceMsg('Saved. Labels will refresh across the console.')
+              await state.reload()
+            } catch (err) {
+              setAudienceMsg(err instanceof Error ? err.message : 'Save failed')
+            } finally {
+              setBusy(false)
+            }
+          }}
+        >
+          Save wording
+        </button>
+        {audienceMsg && <p style={{ margin: 0 }}>{audienceMsg}</p>}
+      </section>
 
       <section className="nx-panel nx-form-grid nx-animate-in" style={{ maxWidth: 720, marginBottom: '1rem' }}>
         <h2 className="nx-panel-title">Mailbox (SMTP)</h2>
