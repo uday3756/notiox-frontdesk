@@ -10,22 +10,31 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as CalendarRouteImport } from './routes/calendar'
 import { Route as ClientsRouteImport } from './routes/clients'
 import { Route as CodesRouteImport } from './routes/codes'
 import { Route as DashboardRouteImport } from './routes/dashboard'
 import { Route as EmailRouteImport } from './routes/email'
 import { Route as LoginRouteImport } from './routes/login'
+import { Route as OfferingsRouteImport } from './routes/offerings'
 import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as TasksRouteImport } from './routes/tasks'
 import { Route as AuthCallbackRouteImport } from './routes/auth.callback'
+import { Route as AuthGoogleCalendarRouteImport } from './routes/auth.google-calendar'
 import { Route as ClientsIndexRouteImport } from './routes/clients.index'
 import { Route as ClientsClientIdRouteImport } from './routes/clients.$clientId'
 import { Route as EmailIndexRouteImport } from './routes/email.index'
 import { Route as EmailStudioRouteImport } from './routes/email.studio'
+import { Route as OOwnerIdOfferingIdRouteImport } from './routes/o.$ownerId.$offeringId'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CalendarRoute = CalendarRouteImport.update({
+  id: '/calendar',
+  path: '/calendar',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ClientsRoute = ClientsRouteImport.update({
@@ -53,6 +62,11 @@ const LoginRoute = LoginRouteImport.update({
   path: '/login',
   getParentRoute: () => rootRouteImport,
 } as any)
+const OfferingsRoute = OfferingsRouteImport.update({
+  id: '/offerings',
+  path: '/offerings',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const SettingsRoute = SettingsRouteImport.update({
   id: '/settings',
   path: '/settings',
@@ -66,6 +80,11 @@ const TasksRoute = TasksRouteImport.update({
 const AuthCallbackRoute = AuthCallbackRouteImport.update({
   id: '/auth/callback',
   path: '/auth/callback',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AuthGoogleCalendarRoute = AuthGoogleCalendarRouteImport.update({
+  id: '/auth/google-calendar',
+  path: '/auth/google-calendar',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ClientsIndexRoute = ClientsIndexRouteImport.update({
@@ -88,107 +107,140 @@ const EmailStudioRoute = EmailStudioRouteImport.update({
   path: '/studio',
   getParentRoute: () => EmailRoute,
 } as any)
+const OOwnerIdOfferingIdRoute = OOwnerIdOfferingIdRouteImport.update({
+  id: '/o/$ownerId/$offeringId',
+  path: '/o/$ownerId/$offeringId',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/calendar': typeof CalendarRoute
   '/clients': typeof ClientsRouteWithChildren
   '/codes': typeof CodesRoute
   '/dashboard': typeof DashboardRoute
   '/email': typeof EmailRouteWithChildren
   '/login': typeof LoginRoute
+  '/offerings': typeof OfferingsRoute
   '/settings': typeof SettingsRoute
   '/tasks': typeof TasksRoute
   '/auth/callback': typeof AuthCallbackRoute
+  '/auth/google-calendar': typeof AuthGoogleCalendarRoute
   '/clients/$clientId': typeof ClientsClientIdRoute
   '/email/studio': typeof EmailStudioRoute
   '/clients/': typeof ClientsIndexRoute
   '/email/': typeof EmailIndexRoute
+  '/o/$ownerId/$offeringId': typeof OOwnerIdOfferingIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/calendar': typeof CalendarRoute
   '/codes': typeof CodesRoute
   '/dashboard': typeof DashboardRoute
   '/login': typeof LoginRoute
+  '/offerings': typeof OfferingsRoute
   '/settings': typeof SettingsRoute
   '/tasks': typeof TasksRoute
   '/auth/callback': typeof AuthCallbackRoute
+  '/auth/google-calendar': typeof AuthGoogleCalendarRoute
   '/clients/$clientId': typeof ClientsClientIdRoute
   '/email/studio': typeof EmailStudioRoute
   '/clients': typeof ClientsIndexRoute
   '/email': typeof EmailIndexRoute
+  '/o/$ownerId/$offeringId': typeof OOwnerIdOfferingIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/calendar': typeof CalendarRoute
   '/clients': typeof ClientsRouteWithChildren
   '/codes': typeof CodesRoute
   '/dashboard': typeof DashboardRoute
   '/email': typeof EmailRouteWithChildren
   '/login': typeof LoginRoute
+  '/offerings': typeof OfferingsRoute
   '/settings': typeof SettingsRoute
   '/tasks': typeof TasksRoute
   '/auth/callback': typeof AuthCallbackRoute
+  '/auth/google-calendar': typeof AuthGoogleCalendarRoute
   '/clients/$clientId': typeof ClientsClientIdRoute
   '/email/studio': typeof EmailStudioRoute
   '/clients/': typeof ClientsIndexRoute
   '/email/': typeof EmailIndexRoute
+  '/o/$ownerId/$offeringId': typeof OOwnerIdOfferingIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/calendar'
     | '/clients'
     | '/codes'
     | '/dashboard'
     | '/email'
     | '/login'
+    | '/offerings'
     | '/settings'
     | '/tasks'
     | '/auth/callback'
+    | '/auth/google-calendar'
     | '/clients/$clientId'
     | '/email/studio'
     | '/clients/'
     | '/email/'
+    | '/o/$ownerId/$offeringId'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/calendar'
     | '/codes'
     | '/dashboard'
     | '/login'
+    | '/offerings'
     | '/settings'
     | '/tasks'
     | '/auth/callback'
+    | '/auth/google-calendar'
     | '/clients/$clientId'
     | '/email/studio'
     | '/clients'
     | '/email'
+    | '/o/$ownerId/$offeringId'
   id:
     | '__root__'
     | '/'
+    | '/calendar'
     | '/clients'
     | '/codes'
     | '/dashboard'
     | '/email'
     | '/login'
+    | '/offerings'
     | '/settings'
     | '/tasks'
     | '/auth/callback'
+    | '/auth/google-calendar'
     | '/clients/$clientId'
     | '/email/studio'
     | '/clients/'
     | '/email/'
+    | '/o/$ownerId/$offeringId'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  CalendarRoute: typeof CalendarRoute
   ClientsRoute: typeof ClientsRouteWithChildren
   CodesRoute: typeof CodesRoute
   DashboardRoute: typeof DashboardRoute
   EmailRoute: typeof EmailRouteWithChildren
   LoginRoute: typeof LoginRoute
+  OfferingsRoute: typeof OfferingsRoute
   SettingsRoute: typeof SettingsRoute
   TasksRoute: typeof TasksRoute
   AuthCallbackRoute: typeof AuthCallbackRoute
+  AuthGoogleCalendarRoute: typeof AuthGoogleCalendarRoute
+  OOwnerIdOfferingIdRoute: typeof OOwnerIdOfferingIdRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -198,6 +250,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/calendar': {
+      id: '/calendar'
+      path: '/calendar'
+      fullPath: '/calendar'
+      preLoaderRoute: typeof CalendarRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/clients': {
@@ -235,6 +294,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof LoginRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/offerings': {
+      id: '/offerings'
+      path: '/offerings'
+      fullPath: '/offerings'
+      preLoaderRoute: typeof OfferingsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/settings': {
       id: '/settings'
       path: '/settings'
@@ -254,6 +320,13 @@ declare module '@tanstack/react-router' {
       path: '/auth/callback'
       fullPath: '/auth/callback'
       preLoaderRoute: typeof AuthCallbackRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/auth/google-calendar': {
+      id: '/auth/google-calendar'
+      path: '/auth/google-calendar'
+      fullPath: '/auth/google-calendar'
+      preLoaderRoute: typeof AuthGoogleCalendarRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/clients/': {
@@ -283,6 +356,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/email/studio'
       preLoaderRoute: typeof EmailStudioRouteImport
       parentRoute: typeof EmailRoute
+    }
+    '/o/$ownerId/$offeringId': {
+      id: '/o/$ownerId/$offeringId'
+      path: '/o/$ownerId/$offeringId'
+      fullPath: '/o/$ownerId/$offeringId'
+      preLoaderRoute: typeof OOwnerIdOfferingIdRouteImport
+      parentRoute: typeof rootRouteImport
     }
   }
 }
@@ -314,14 +394,18 @@ const EmailRouteWithChildren = EmailRoute._addFileChildren(EmailRouteChildren)
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  CalendarRoute: CalendarRoute,
   ClientsRoute: ClientsRouteWithChildren,
   CodesRoute: CodesRoute,
   DashboardRoute: DashboardRoute,
   EmailRoute: EmailRouteWithChildren,
   LoginRoute: LoginRoute,
+  OfferingsRoute: OfferingsRoute,
   SettingsRoute: SettingsRoute,
   TasksRoute: TasksRoute,
   AuthCallbackRoute: AuthCallbackRoute,
+  AuthGoogleCalendarRoute: AuthGoogleCalendarRoute,
+  OOwnerIdOfferingIdRoute: OOwnerIdOfferingIdRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
