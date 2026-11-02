@@ -92,6 +92,7 @@ export const demoTasks: OwnerTask[] = [
   {
     id: 't1',
     owner_id: 'demo-owner',
+    topic_id: null,
     title: 'Complete weekly focus review',
     description: 'Reflect on wins and blockers in NotioX.',
     due_at: new Date(Date.now() + 86400000 * 3).toISOString(),
@@ -102,6 +103,7 @@ export const demoTasks: OwnerTask[] = [
   {
     id: 't2',
     owner_id: 'demo-owner',
+    topic_id: null,
     title: 'Log sleep for 5 nights',
     description: null,
     due_at: new Date(Date.now() + 86400000 * 7).toISOString(),

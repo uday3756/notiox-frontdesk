@@ -59,15 +59,31 @@ export interface OwnerCode {
   created_at: string
 }
 
+export interface OwnerTopic {
+  id: string
+  owner_id: string
+  title: string
+  description: string | null
+  created_at: string
+}
+
 export interface OwnerTask {
   id: string
   owner_id: string
+  topic_id: string | null
   title: string
   description: string | null
   due_at: string | null
   priority: TaskPriority
   status: TaskStatus
   created_at: string
+}
+
+export interface OwnerAppConnection {
+  virtual_domain: string
+  school_domain: string | null
+  api_key: string
+  updated_at: string
 }
 
 export interface OwnerTaskAssignment {

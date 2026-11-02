@@ -6,7 +6,7 @@ import { useOwnerQuery } from '~/components/useOwnerQuery'
 import { DNS_SETUP_STEPS } from '~/lib/hostAllowlist'
 import { getAccessToken } from '~/lib/session'
 import { ROLE_LABELS } from '~/lib/types'
-import { getSettings, updateSettings } from '~/server/data'
+import { getSettings, saveAppConnection, updateSettings } from '~/server/data'
 
 export const Route = createFileRoute('/settings')({
   component: SettingsPage,
@@ -25,6 +25,7 @@ function SettingsPage() {
   const [timezone, setTimezone] = useState('')
   const [notes, setNotes] = useState('')
   const [newPassword, setNewPassword] = useState('')
+  const [schoolDomain, setSchoolDomain] = useState('')
   const [msg, setMsg] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
 
@@ -38,6 +39,7 @@ function SettingsPage() {
       setCountry(String(s.country ?? ''))
       setTimezone(String(s.timezone ?? ''))
       setNotes(String(s.notes ?? ''))
+      setSchoolDomain(state.data.app?.school_domain || '')
     }
   }, [state])
 
@@ -204,6 +206,94 @@ function SettingsPage() {
         </button>
         {msg && <p style={{ margin: 0 }}>{msg}</p>}
       </form>
+
+      <section className="nx-panel nx-animate-in" style={{ maxWidth: 720, marginBottom: '1rem' }}>
+        <h2 className="nx-panel-title">Connect student app</h2>
+        <p className="nx-panel-muted">
+          Back office still creates the owner email, password, and role. Here you share the{' '}
+          <strong>virtual domain</strong> (current host) and an <strong>API key</strong> so the NotioX
+          student app can plug into this owner. When you have a real school domain later, put it below.
+        </p>
+        <div className="nx-form-grid">
+          <div>
+            <label className="nx-label">Virtual domain (current host)</label>
+            <input className="nx-input" readOnly value={state.data.virtualDomain} />
+          </div>
+          <div>
+            <label className="nx-label" htmlFor="schoolDomain">
+              School / clinic domain (optional, future)
+            </label>
+            <input
+              id="schoolDomain"
+              className="nx-input"
+              placeholder="desk.yourschool.edu"
+              value={schoolDomain}
+              onChange={(e) => setSchoolDomain(e.target.value)}
+            />
+          </div>
+          <div>
+            <label className="nx-label">Owner API key (for the student app)</label>
+            <input
+              className="nx-input"
+              readOnly
+              value={state.data.app?.api_key || '(generate to create)'}
+            />
+          </div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
+            <button
+              type="button"
+              className="nx-btn nx-btn-primary"
+              disabled={busy}
+              onClick={async () => {
+                setBusy(true)
+                setMsg(null)
+                try {
+                  const accessToken = (await getAccessToken()) || undefined
+                  await saveAppConnection({
+                    data: {
+                      accessToken,
+                      schoolDomain: schoolDomain || undefined,
+                      rotateKey: !state.data.app?.api_key,
+                    },
+                  })
+                  setMsg('App connection saved. Copy the API key into the student app.')
+                  await state.reload()
+                } catch (err) {
+                  setMsg(err instanceof Error ? err.message : 'Save failed')
+                } finally {
+                  setBusy(false)
+                }
+              }}
+            >
+              {state.data.app?.api_key ? 'Save domain' : 'Generate API key'}
+            </button>
+            {state.data.app?.api_key && (
+              <button
+                type="button"
+                className="nx-btn nx-btn-ghost"
+                disabled={busy}
+                onClick={async () => {
+                  setBusy(true)
+                  try {
+                    const accessToken = (await getAccessToken()) || undefined
+                    await saveAppConnection({
+                      data: { accessToken, schoolDomain: schoolDomain || undefined, rotateKey: true },
+                    })
+                    setMsg('New API key generated. Update the student app.')
+                    await state.reload()
+                  } catch (err) {
+                    setMsg(err instanceof Error ? err.message : 'Rotate failed')
+                  } finally {
+                    setBusy(false)
+                  }
+                }}
+              >
+                Rotate key
+              </button>
+            )}
+          </div>
+        </div>
+      </section>
 
       <section className="nx-panel nx-animate-in-delay" style={{ maxWidth: 720, marginBottom: '1rem' }}>
         <h2 className="nx-panel-title">Custom domain DNS</h2>

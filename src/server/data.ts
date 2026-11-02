@@ -5,6 +5,15 @@ import { hasSupabase, missingKeys } from '~/lib/env'
 import { isHostAllowed } from '~/lib/hostAllowlist'
 import { getSupabaseAdmin } from '~/lib/supabase.server'
 import {
+  DEFAULT_VIRTUAL_DOMAIN,
+  insertTaskWithAssignments,
+  insertTopic,
+  loadWorkspace,
+  newApiKey,
+  splitDoctorNotes,
+  upsertAppConnection,
+} from '~/server/fd-store'
+import {
   createOwnerSupabase,
   insightsFromOwnerData,
   loadOwnerClients,
@@ -90,8 +99,11 @@ export const getClient = createServerFn({ method: 'POST' })
     const ctx = await resolveOwnerFromToken(data.accessToken)
     const clients = await loadOwnerClients(ctx.doctor.id, data.accessToken)
     const client = clients.find((c) => c.id === data.id) ?? null
-    // Tasks not yet in shared NotioX schema for Front Desk — empty until owner_tasks exists
-    return { client, assignments: [], tasks: [], authenticated: true as const }
+    const db = createOwnerSupabase(data.accessToken)
+    const { blob } = await loadWorkspace(db, ctx.doctor.id, ctx.doctor.notes)
+    const assignments = blob.assignments.filter((a) => a.client_id === data.id)
+    const tasks = blob.tasks.filter((t) => assignments.some((a) => a.task_id === t.id))
+    return { client, assignments, tasks, authenticated: true as const }
   })
 
 export const listCodes = createServerFn({ method: 'POST' })
@@ -155,15 +167,26 @@ export const listTasks = createServerFn({ method: 'POST' })
     if (!hasSupabase()) throw new Error('Supabase is not configured')
     const ctx = await resolveOwnerFromToken(data.accessToken)
     const clients = await loadOwnerClients(ctx.doctor.id, data.accessToken)
-    // Task rows are session-local until owner_tasks exists; clients always from DB
-    const ownerTasks = demoStore.tasks.filter((t) => t.owner_id === ctx.doctor.id)
-    const ownerAssignments = demoStore.assignments.filter((a) => a.owner_id === ctx.doctor.id)
+    const db = createOwnerSupabase(data.accessToken)
+    const { blob, source } = await loadWorkspace(db, ctx.doctor.id, ctx.doctor.notes)
     return {
-      tasks: ownerTasks,
-      assignments: ownerAssignments,
+      topics: blob.topics,
+      tasks: blob.tasks,
+      assignments: blob.assignments,
       clients,
+      storage: source,
       authenticated: true as const,
     }
+  })
+
+export const createTopic = createServerFn({ method: 'POST' })
+  .validator(tokenInput.extend({ title: z.string().min(1), description: z.string().optional() }))
+  .handler(async ({ data }) => {
+    if (!data.accessToken) throw new Error('Sign in required')
+    if (!hasSupabase()) throw new Error('Supabase is not configured')
+    const ctx = await resolveOwnerFromToken(data.accessToken)
+    const db = createOwnerSupabase(data.accessToken)
+    return insertTopic(db, ctx.doctor.id, ctx.doctor.notes, data.title, data.description)
   })
 
 export const createTask = createServerFn({ method: 'POST' })
@@ -173,6 +196,7 @@ export const createTask = createServerFn({ method: 'POST' })
       description: z.string().optional(),
       priority: z.enum(['low', 'medium', 'high']).default('medium'),
       dueAt: z.string().optional(),
+      topicId: z.string().optional(),
       clientIds: z.array(z.string()).default([]),
     }),
   )
@@ -184,27 +208,15 @@ export const createTask = createServerFn({ method: 'POST' })
     const myClients = await loadOwnerClients(ownerId, data.accessToken)
     const allowed = new Set(myClients.map((c) => c.id))
     const clientIds = data.clientIds.filter((id) => allowed.has(id))
-    const task = {
-      id: `t_${Date.now()}`,
-      owner_id: ownerId,
+    const db = createOwnerSupabase(data.accessToken)
+    return insertTaskWithAssignments(db, ownerId, ctx.doctor.notes, {
       title: data.title,
-      description: data.description ?? null,
-      due_at: data.dueAt ?? null,
+      description: data.description,
       priority: data.priority,
-      status: 'open' as const,
-      created_at: new Date().toISOString(),
-    }
-    demoStore.tasks.unshift(task)
-    const assignments = clientIds.map((clientId, i) => ({
-      id: `a_${Date.now()}_${i}`,
-      owner_id: ownerId,
-      task_id: task.id,
-      client_id: clientId,
-      status: 'pending' as const,
-      completed_at: null,
-    }))
-    demoStore.assignments.push(...assignments)
-    return { task, assignments }
+      topicId: data.topicId,
+      dueAt: data.dueAt,
+      clientIds,
+    })
   })
 
 export const getSettings = createServerFn({ method: 'POST' })
@@ -218,10 +230,19 @@ export const getSettings = createServerFn({ method: 'POST' })
       .filter(Boolean)
 
     const ctx = await resolveOwnerFromToken(data.accessToken)
+    const db = createOwnerSupabase(data.accessToken)
+    const { blob, source } = await loadWorkspace(db, ctx.doctor.id, ctx.doctor.notes)
+    const virtualDomain =
+      blob.app?.virtual_domain ||
+      process.env.APP_HOST ||
+      DEFAULT_VIRTUAL_DOMAIN
     return {
       owner: ctx.owner,
       allowedHosts,
       missingKeys: missingKeys(),
+      app: blob.app,
+      virtualDomain,
+      storage: source,
       authenticated: true as const,
     }
   })
@@ -254,7 +275,18 @@ export const updateSettings = createServerFn({ method: 'POST' })
     if (data.specialty !== undefined) patch.specialty = data.specialty
     if (data.country !== undefined) patch.country = data.country
     if (data.timezone !== undefined) patch.timezone = data.timezone
-    if (data.notes !== undefined) patch.notes = data.notes
+    if (data.notes !== undefined) {
+      const { blob } = splitDoctorNotes(ctx.doctor.notes)
+      patch.notes = JSON.stringify({
+        bio: data.notes,
+        __nxfd__: {
+          topics: blob.topics,
+          tasks: blob.tasks,
+          assignments: blob.assignments,
+          app: blob.app,
+        },
+      })
+    }
 
     if (data.newPassword) {
       const admin = getSupabaseAdmin()
@@ -272,6 +304,31 @@ export const updateSettings = createServerFn({ method: 'POST' })
     }
     const refreshed = await resolveOwnerFromToken(data.accessToken)
     return { owner: refreshed.owner }
+  })
+
+export const saveAppConnection = createServerFn({ method: 'POST' })
+  .validator(
+    tokenInput.extend({
+      schoolDomain: z.string().optional(),
+      rotateKey: z.boolean().optional(),
+    }),
+  )
+  .handler(async ({ data }) => {
+    if (!data.accessToken) throw new Error('Sign in required')
+    if (!hasSupabase()) throw new Error('Supabase is not configured')
+    const ctx = await resolveOwnerFromToken(data.accessToken)
+    const db = createOwnerSupabase(data.accessToken)
+    const { blob } = await loadWorkspace(db, ctx.doctor.id, ctx.doctor.notes)
+    const virtualDomain = process.env.APP_HOST || DEFAULT_VIRTUAL_DOMAIN
+    const school = (data.schoolDomain || blob.app?.school_domain || '').trim() || null
+    const apiKey =
+      data.rotateKey || !blob.app?.api_key ? newApiKey() : blob.app.api_key
+    return upsertAppConnection(db, ctx.doctor.id, ctx.doctor.notes, {
+      virtual_domain: virtualDomain,
+      school_domain: school,
+      api_key: apiKey,
+      updated_at: new Date().toISOString(),
+    })
   })
 
 export const checkHost = createServerFn({ method: 'GET' })

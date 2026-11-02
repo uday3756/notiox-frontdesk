@@ -1,4 +1,5 @@
 import type { ClientStatus, Owner, OwnerClient, OwnerCode, OwnerRole } from './types'
+import { splitDoctorNotes } from '~/server/fd-store'
 
 export type DoctorRow = {
   id: string
@@ -51,7 +52,7 @@ export function doctorToOwner(doctor: DoctorRow): Owner {
       password_must_change: doctor.password_must_change,
       country: doctor.country,
       timezone: doctor.timezone,
-      notes: doctor.notes,
+      notes: splitDoctorNotes(doctor.notes).bio,
       clinic_organization: doctor.clinic_organization,
     },
   }

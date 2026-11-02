@@ -57,7 +57,7 @@ export const env = {
   aiApiKey: () => read('AI_API_KEY') || read('GROQ_API_KEY') || read('OPENAI_API_KEY'),
   aiApiUrl: () =>
     envSoft('AI_API_URL', 'https://api.groq.com/openai/v1/chat/completions'),
-  aiModel: () => envSoft('AI_MODEL', 'llama-3.1-8b-instant'),
+  aiModel: () => envSoft('AI_MODEL', 'openai/gpt-oss-20b'),
   stripeSecret: () => read('STRIPE_SECRET_KEY'),
   stripePublishable: () =>
     read('VITE_STRIPE_PUBLISHABLE_KEY') || read('STRIPE_PUBLISHABLE_KEY'),
