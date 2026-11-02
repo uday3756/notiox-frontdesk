@@ -53,6 +53,12 @@ export const env = {
   smtpPass: () => read('SMTP_PASS'),
   smtpFrom: () => envSoft('SMTP_FROM') || envSoft('SMTP_USER'),
   smtpTestTo: () => read('SMTP_TEST_TO'),
+  resendApiKey: () => read('RESEND_API_KEY'),
+  resendFrom: () =>
+    envSoft('RESEND_FROM') ||
+    (envSoft('RESEND_FROM_EMAIL')
+      ? `Front Desk <${envSoft('RESEND_FROM_EMAIL')}>`
+      : 'Front Desk <no-reply@notiolive.com>'),
   /** OpenAI-compatible (Groq free tier: https://api.groq.com/openai/v1/chat/completions) */
   aiApiKey: () => read('AI_API_KEY') || read('GROQ_API_KEY') || read('OPENAI_API_KEY'),
   aiApiUrl: () =>

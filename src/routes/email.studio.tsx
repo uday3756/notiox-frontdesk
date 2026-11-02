@@ -148,7 +148,7 @@ function EmailStudioPage() {
         setTested(true)
         setLog(
           result.demo
-            ? `Test verified for ${result.testedTo} (simulated). Save your mailbox in Settings first.`
+            ? `Test verified for ${result.testedTo} (simulated — platform mail not configured).`
             : `Test announcement sent to ${result.testedTo}. Bulk send unlocked.`,
         )
       }
@@ -185,7 +185,7 @@ function EmailStudioPage() {
       else {
         setLog(
           result.demo
-            ? `Bulk simulated to ${result.recipientCount} address(es). Save your mailbox in Settings to deliver.`
+            ? `Bulk simulated to ${result.recipientCount} address(es). Platform mail is not configured.`
             : `Bulk announcement sent to ${result.recipientCount} address(es).`,
         )
       }
@@ -361,8 +361,8 @@ function EmailStudioPage() {
           Send from Studio
         </h2>
         <p className="nx-panel-muted" style={{ margin: 0 }}>
-          Sends from the mailbox you saved in <Link to="/settings">Settings</Link> (Gmail app
-          password, not your normal password).
+          Sends from Front Desk (<code>no-reply@notiolive.com</code>). You can still save a personal
+          mailbox in <Link to="/settings">Settings</Link> later.
         </p>
         <div>
           <label className="nx-label" htmlFor="studioTestTo">

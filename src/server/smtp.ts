@@ -57,6 +57,58 @@ function resolveAccount(override?: OwnerSmtpConfig | null): OwnerSmtpConfig | nu
   return envSmtp()
 }
 
+async function sendViaResend(opts: {
+  to: string[]
+  subject: string
+  html: string
+  text?: string
+}): Promise<SmtpSendResult> {
+  const key = env.resendApiKey()
+  if (!key) {
+    return { ok: false, error: 'RESEND_API_KEY missing' }
+  }
+  const from = env.resendFrom()
+  let sent = 0
+  const ids: string[] = []
+  try {
+    for (const to of opts.to) {
+      const res = await fetch('https://api.resend.com/emails', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${key}`,
+          'Content-Type': 'application/json',
+          'User-Agent': 'notiox-frontdesk/1.0',
+        },
+        body: JSON.stringify({
+          from,
+          to: [to],
+          subject: opts.subject,
+          html: opts.html,
+          text: opts.text,
+        }),
+      })
+      const body = (await res.json().catch(() => ({}))) as { id?: string; message?: string; name?: string }
+      if (!res.ok) {
+        return {
+          ok: false,
+          sent,
+          error: body.message || body.name || `Resend ${res.status}`,
+        }
+      }
+      sent += 1
+      if (body.id) ids.push(body.id)
+      if (opts.to.length > 1) await new Promise((r) => setTimeout(r, 120))
+    }
+    return { ok: true, id: ids[0], sent, skipped: opts.to.length - sent }
+  } catch (e) {
+    return {
+      ok: false,
+      sent,
+      error: e instanceof Error ? e.message : 'Resend send failed',
+    }
+  }
+}
+
 function transporter(cfg: OwnerSmtpConfig) {
   const port = cfg.port || 587
   return nodemailer.createTransport({
@@ -71,8 +123,7 @@ function transporter(cfg: OwnerSmtpConfig) {
 }
 
 /**
- * Open-source SMTP send (Nodemailer). Prefers the signed-in owner's
- * Settings mailbox, then project env, otherwise a simulated send.
+ * Send mail: Resend (platform no-reply) first, then owner/env SMTP, else simulate.
  */
 export async function sendMailSmtp(opts: {
   to: string | string[]
@@ -89,6 +140,15 @@ export async function sendMailSmtp(opts: {
     return { ok: false, error: 'No valid recipient emails' }
   }
 
+  if (env.resendApiKey()) {
+    return sendViaResend({
+      to: recipients,
+      subject: opts.subject,
+      html: opts.html,
+      text: opts.text,
+    })
+  }
+
   const account = resolveAccount(opts.smtp)
   if (!account) {
     return {
@@ -98,7 +158,7 @@ export async function sendMailSmtp(opts: {
       sent: 0,
       skipped: recipients.length,
       error:
-        'SMTP not configured — simulated send. Save your Gmail/clinic mailbox in Settings (SMTP user, app password, from).',
+        'Mail not configured — simulated send. Platform Resend key or an owner mailbox in Settings is required.',
     }
   }
 

@@ -135,7 +135,7 @@ function EmailCampaignsPage() {
         setTested(true)
         setLog(
           result.demo
-            ? `Test verified for ${result.testedTo} (simulated). Save your mailbox in Settings to send for real.`
+            ? `Test verified for ${result.testedTo} (simulated — platform mail not configured).`
             : `Test sent to ${result.testedTo}. Real send unlocked.`,
         )
       }
@@ -169,7 +169,7 @@ function EmailCampaignsPage() {
       else {
         setLog(
           result.demo
-            ? `Send simulated to ${result.recipientCount} client(s). Save your mailbox in Settings to deliver.`
+            ? `Send simulated to ${result.recipientCount} client(s). Platform mail is not configured.`
             : `Sent to ${result.recipientCount} client(s).`,
         )
       }
@@ -192,9 +192,9 @@ function EmailCampaignsPage() {
       <div className="nx-panel nx-form-grid nx-animate-in">
         <h2 className="nx-panel-title">Campaign</h2>
         <p className="nx-panel-muted" style={{ margin: 0 }}>
-          Build the HTML in <Link to="/email/studio">AI Studio</Link>, or edit here. Sends through{' '}
-          <strong>Nodemailer SMTP</strong> using the mailbox you save in{' '}
-          <Link to="/settings">Settings</Link> (no Resend).
+          Build the HTML in <Link to="/email/studio">AI Studio</Link>, or edit here. Sends from{' '}
+          <strong>no-reply@notiolive.com</strong> (Resend). Optional personal mailbox is in{' '}
+          <Link to="/settings">Settings</Link>.
         </p>
         <div>
           <label className="nx-label" htmlFor="subject">

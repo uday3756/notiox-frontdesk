@@ -326,9 +326,9 @@ function SettingsPage() {
       <section className="nx-panel nx-form-grid nx-animate-in" style={{ maxWidth: 720, marginBottom: '1rem' }}>
         <h2 className="nx-panel-title">Mailbox (SMTP)</h2>
         <p className="nx-panel-muted" style={{ margin: 0 }}>
-          Each owner sends from their own Gmail or clinic mailbox. Use a{' '}
-          <strong>Gmail app password</strong>, not your normal Gmail password. Saved on your owner
-          record — never shown back after save.
+          Campaigns send from the platform address <code>no-reply@notiolive.com</code>. A personal
+          Gmail/clinic mailbox here is optional. Use an <strong>app password</strong>, not a normal
+          Gmail password. Never shown back after save.
         </p>
         <div style={{ display: 'grid', gap: '0.85rem', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))' }}>
           <div>
