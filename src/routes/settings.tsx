@@ -33,7 +33,9 @@ function SettingsPage() {
   const [smtpFrom, setSmtpFrom] = useState('')
   const [smtpTestTo, setSmtpTestTo] = useState('')
   const [smtpHasPass, setSmtpHasPass] = useState(false)
+  const [smtpConfigured, setSmtpConfigured] = useState(false)
   const [msg, setMsg] = useState<string | null>(null)
+  const [smtpMsg, setSmtpMsg] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
 
   useEffect(() => {
@@ -53,6 +55,7 @@ function SettingsPage() {
       setSmtpUser(smtp?.user || owner.email || '')
       setSmtpFrom(smtp?.from || (owner.email ? `Front Desk <${owner.email}>` : ''))
       setSmtpHasPass(Boolean(smtp?.hasPass))
+      setSmtpConfigured(Boolean(smtp?.configured))
       setSmtpPass('')
       if (!smtpTestTo) setSmtpTestTo(owner.email || '')
     }
@@ -312,15 +315,18 @@ function SettingsPage() {
           Gmail: Google Account → Security → 2-Step Verification → App passwords. Host{' '}
           <code>smtp.gmail.com</code>, port <code>587</code>.
         </p>
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', alignItems: 'center' }}>
           <button
             type="button"
             className="nx-btn nx-btn-primary"
-            disabled={busy}
+            disabled={busy || !smtpUser.trim()}
             onClick={async () => {
               setBusy(true)
-              setMsg(null)
+              setSmtpMsg(null)
               try {
+                if (!smtpPass.trim() && !smtpHasPass) {
+                  throw new Error('Paste your Gmail app password (16 characters). Leave blank only when updating other fields after a save.')
+                }
                 const accessToken = (await getAccessToken()) || undefined
                 const result = await saveSmtpSettings({
                   data: {
@@ -335,29 +341,61 @@ function SettingsPage() {
                 })
                 setSmtpPass('')
                 setSmtpHasPass(Boolean(result.smtp.hasPass))
+                setSmtpConfigured(Boolean(result.smtp.configured))
                 if (result.test) {
                   if (!result.test.ok) {
-                    setMsg(result.test.error || 'Mailbox saved, but test send failed')
+                    setSmtpMsg(result.test.error || 'Mailbox saved, but test send failed')
                   } else if (result.test.demo) {
-                    setMsg('Mailbox saved, but send was simulated — check host, user, and app password.')
+                    setSmtpMsg('Mailbox saved, but send was simulated — check host, user, and app password.')
                   } else {
-                    setMsg(`Mailbox saved. Test delivered to ${smtpTestTo}.`)
+                    setSmtpMsg(`Mailbox saved. Test delivered to ${smtpTestTo}.`)
                   }
                 } else {
-                  setMsg('Mailbox saved. AI Studio test and bulk send will use this account.')
+                  setSmtpMsg('Mailbox saved. AI Studio test and bulk send will use this account.')
                 }
                 await state.reload()
               } catch (err) {
-                setMsg(err instanceof Error ? err.message : 'SMTP save failed')
+                setSmtpMsg(err instanceof Error ? err.message : 'SMTP save failed')
               } finally {
                 setBusy(false)
               }
             }}
           >
-            Save mailbox
+            {smtpConfigured ? 'Update mailbox' : 'Save mailbox'}
           </button>
+          {smtpConfigured && (
+            <button
+              type="button"
+              className="nx-btn nx-btn-ghost"
+              disabled={busy}
+              onClick={async () => {
+                setBusy(true)
+                setSmtpMsg(null)
+                try {
+                  const accessToken = (await getAccessToken()) || undefined
+                  await saveSmtpSettings({ data: { accessToken, clear: true } })
+                  setSmtpPass('')
+                  setSmtpHasPass(false)
+                  setSmtpConfigured(false)
+                  setSmtpMsg('Mailbox cleared. Campaigns will simulate until you save again.')
+                  await state.reload()
+                } catch (err) {
+                  setSmtpMsg(err instanceof Error ? err.message : 'Clear failed')
+                } finally {
+                  setBusy(false)
+                }
+              }}
+            >
+              Clear mailbox
+            </button>
+          )}
+          {smtpConfigured && (
+            <span className="nx-panel-muted" style={{ fontSize: '0.85rem' }}>
+              Connected{smtpHasPass ? ' · password saved' : ''}
+            </span>
+          )}
         </div>
-        {msg && <p style={{ margin: 0 }}>{msg}</p>}
+        {smtpMsg && <p style={{ margin: 0 }}>{smtpMsg}</p>}
       </section>
 
       <section className="nx-panel nx-animate-in" style={{ maxWidth: 720, marginBottom: '1rem' }}>

@@ -6,6 +6,7 @@ import type {
   OwnerTaskAssignment,
   OwnerTopic,
 } from '~/lib/types'
+import { getSupabaseAdmin } from '~/lib/supabase.server'
 
 const MARKER = '__nxfd__'
 
@@ -117,17 +118,30 @@ export async function loadWorkspace(
   }
 }
 
+/**
+ * Persist the __nxfd__ workspace blob on doctors.notes.
+ * Shared NotioX doctors RLS often allows SELECT but not UPDATE for the owner JWT,
+ * so we write with the service role after the caller has already authenticated the owner.
+ */
 export async function saveNotesBlob(
-  db: SupabaseClient,
+  _db: SupabaseClient,
   doctorId: string,
   bio: string,
   blob: Blob,
 ) {
-  const { error } = await db
+  const admin = getSupabaseAdmin()
+  if (!admin) {
+    throw new Error(
+      'Saving mailbox/settings needs SUPABASE_SERVICE_ROLE_KEY on the server (owner JWT cannot update doctors).',
+    )
+  }
+  const { data, error } = await admin
     .from('doctors')
     .update({ notes: joinDoctorNotes(bio, blob) })
     .eq('id', doctorId)
+    .select('id')
   if (error) throw new Error(error.message)
+  if (!data?.length) throw new Error('Could not update doctor profile (no matching row).')
 }
 
 export async function insertTopic(
@@ -257,8 +271,8 @@ export async function saveSmtpConfig(
   db: SupabaseClient,
   doctorId: string,
   notes: string | null,
-  smtp: OwnerSmtpConfig,
-): Promise<OwnerSmtpConfig> {
+  smtp: OwnerSmtpConfig | null,
+): Promise<OwnerSmtpConfig | null> {
   const { bio, blob } = splitDoctorNotes(notes)
   blob.smtp = smtp
   await saveNotesBlob(db, doctorId, bio, blob)

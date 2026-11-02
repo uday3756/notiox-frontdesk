@@ -271,7 +271,6 @@ export const updateSettings = createServerFn({ method: 'POST' })
     if (!hasSupabase()) throw new Error('Supabase is not configured')
 
     const ctx = await resolveOwnerFromToken(data.accessToken)
-    const db = createOwnerSupabase(data.accessToken)
     const patch: Record<string, unknown> = {}
     if (data.fullName !== undefined) patch.full_name = data.fullName
     if (data.brandName !== undefined) patch.clinic_organization = data.brandName
@@ -292,9 +291,14 @@ export const updateSettings = createServerFn({ method: 'POST' })
       })
     }
 
+    const admin = getSupabaseAdmin()
+    if (!admin) {
+      throw new Error(
+        'Profile save needs SUPABASE_SERVICE_ROLE_KEY on the server (owner JWT cannot update doctors).',
+      )
+    }
+
     if (data.newPassword) {
-      const admin = getSupabaseAdmin()
-      if (!admin) throw new Error('Password change requires server SUPABASE_SERVICE_ROLE_KEY')
       const { error: pwErr } = await admin.auth.admin.updateUserById(ctx.userId, {
         password: data.newPassword,
       })
@@ -303,8 +307,13 @@ export const updateSettings = createServerFn({ method: 'POST' })
     }
 
     if (Object.keys(patch).length) {
-      const { error } = await db.from('doctors').update(patch).eq('id', ctx.doctor.id)
+      const { data: updated, error } = await admin
+        .from('doctors')
+        .update(patch)
+        .eq('id', ctx.doctor.id)
+        .select('id')
       if (error) throw new Error(error.message)
+      if (!updated?.length) throw new Error('Could not update doctor profile (no matching row).')
     }
     const refreshed = await resolveOwnerFromToken(data.accessToken)
     return { owner: refreshed.owner }
@@ -316,10 +325,11 @@ export const saveSmtpSettings = createServerFn({ method: 'POST' })
       host: z.string().optional(),
       port: z.number().int().positive().optional(),
       secure: z.boolean().optional(),
-      user: z.string().min(1),
+      user: z.string().optional(),
       pass: z.string().optional(),
       from: z.string().optional(),
       testTo: z.string().optional(),
+      clear: z.boolean().optional(),
     }),
   )
   .handler(async ({ data }) => {
@@ -328,18 +338,25 @@ export const saveSmtpSettings = createServerFn({ method: 'POST' })
     const ctx = await resolveOwnerFromToken(data.accessToken)
     const db = createOwnerSupabase(data.accessToken)
     const { blob } = await loadWorkspace(db, ctx.doctor.id, ctx.doctor.notes)
+
+    if (data.clear) {
+      await saveSmtpConfig(db, ctx.doctor.id, ctx.doctor.notes, null)
+      return { smtp: publicSmtp(null), cleared: true as const }
+    }
+
+    const user = (data.user || '').trim()
+    if (!user.includes('@')) {
+      throw new Error('SMTP user must be your full mailbox address (e.g. you@gmail.com)')
+    }
     const smtp = normalizeSmtpInput({
       host: data.host,
       port: data.port,
       secure: data.secure,
-      user: data.user,
+      user,
       pass: data.pass,
       from: data.from,
       existing: blob.smtp,
     })
-    if (!smtp.user.includes('@')) {
-      throw new Error('SMTP user must be your full mailbox address (e.g. you@gmail.com)')
-    }
     if (!smtp.pass) {
       throw new Error('Paste a Gmail app password (not your normal Gmail password)')
     }
@@ -357,7 +374,7 @@ export const saveSmtpSettings = createServerFn({ method: 'POST' })
       })
     }
 
-    return { smtp: publicSmtp(smtp), test }
+    return { smtp: publicSmtp(smtp), test, cleared: false as const }
   })
 
 export const saveAppConnection = createServerFn({ method: 'POST' })
