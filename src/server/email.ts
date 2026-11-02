@@ -20,6 +20,7 @@ const campaignInput = z.object({
   extraContent: z.string().optional(),
   recipientMode: z.enum(['all', 'selected']),
   recipientClientIds: z.array(z.string()).default([]),
+  extraEmails: z.array(z.string().email()).default([]),
   testToEmail: z.string().email().optional(),
   media: mediaInput.optional(),
 })
@@ -90,9 +91,11 @@ export const sendCampaign = createServerFn({ method: 'POST' })
         ? clients.filter((c) => c.status === 'active')
         : clients.filter((c) => data.recipientClientIds.includes(c.id))
 
-    const recipients = chosen.map((c) => c.email).filter((e): e is string => Boolean(e))
+    const fromClients = chosen.map((c) => c.email).filter((e): e is string => Boolean(e) && e.includes('@'))
+    const extra = (data.extraEmails || []).map((e) => e.trim().toLowerCase()).filter((e) => e.includes('@'))
+    const recipients = [...new Set([...fromClients, ...extra])]
     if (!recipients.length) {
-      return { ok: false as const, error: 'No recipients selected (need client emails).' }
+      return { ok: false as const, error: 'No recipients selected (pick clients and/or extra emails).' }
     }
 
     const brand = ctx.owner.brand_name || ctx.owner.full_name || 'Front Desk'

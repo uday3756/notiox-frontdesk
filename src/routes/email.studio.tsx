@@ -1,21 +1,33 @@
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
-import { useCallback, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useOwnerQuery } from '~/components/useOwnerQuery'
 import { EMAIL_TEMPLATE_STORAGE_KEY, wrapCampaignHtml } from '~/lib/email-html'
 import { getAccessToken } from '~/lib/session'
-import { getBootstrap } from '~/server/data'
+import { getBootstrap, listClients } from '~/server/data'
+import { sendCampaign, testSendCampaign } from '~/server/email'
 import { generateEmailTemplate } from '~/server/email-ai'
 
 export const Route = createFileRoute('/email/studio')({
   component: EmailStudioPage,
 })
 
+function parseExtraEmails(raw: string): string[] {
+  return raw
+    .split(/[\s,;]+/)
+    .map((e) => e.trim().toLowerCase())
+    .filter((e) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e))
+}
+
 function EmailStudioPage() {
   const navigate = useNavigate()
-  const fetchBoot = useCallback(async (accessToken: string | undefined) => {
-    return getBootstrap({ data: { accessToken } })
+  const fetchPage = useCallback(async (accessToken: string | undefined) => {
+    const [boot, clients] = await Promise.all([
+      getBootstrap({ data: { accessToken } }),
+      listClients({ data: { accessToken } }),
+    ])
+    return { boot, ...clients }
   }, [])
-  const state = useOwnerQuery(fetchBoot, { requireAuth: true })
+  const state = useOwnerQuery(fetchPage, { requireAuth: true })
 
   const [prompt, setPrompt] = useState(
     'Write a weekly check-in for ADHD coaching clients. Encourage one small win and invite them back to NotioX.',
@@ -30,9 +42,31 @@ function EmailStudioPage() {
   const [busy, setBusy] = useState(false)
   const [log, setLog] = useState<string | null>(null)
   const [previewWidth, setPreviewWidth] = useState<'desktop' | 'mobile'>('desktop')
+  const [testTo, setTestTo] = useState('')
+  const [recipientMode, setRecipientMode] = useState<'all' | 'selected'>('selected')
+  const [selected, setSelected] = useState<string[]>([])
+  const [extraEmails, setExtraEmails] = useState('')
+  const [tested, setTested] = useState(false)
+  const [campaignId, setCampaignId] = useState<string | undefined>()
 
   const brand =
-    state.status === 'ready' ? state.data.owner.brand_name || 'NotioX Front Desk' : 'NotioX Front Desk'
+    state.status === 'ready' ? state.data.boot.owner.brand_name || 'NotioX Front Desk' : 'NotioX Front Desk'
+  const ownerEmail = state.status === 'ready' ? state.data.boot.owner.email : ''
+  const clients = state.status === 'ready' ? state.data.clients : []
+
+  useEffect(() => {
+    if (ownerEmail && !testTo) setTestTo(ownerEmail)
+  }, [ownerEmail, testTo])
+
+  const media = useMemo(
+    () => ({
+      imageUrl: imageUrl || undefined,
+      videoUrl: videoUrl || undefined,
+      linkUrl: linkUrl || undefined,
+      linkLabel: linkLabel || undefined,
+    }),
+    [imageUrl, videoUrl, linkUrl, linkLabel],
+  )
 
   const previewHtml = useMemo(
     () =>
@@ -40,15 +74,14 @@ function EmailStudioPage() {
         brand,
         subject: subject || 'Preview',
         bodyHtml: bodyHtml || '<p style="color:#64748b">Generate a template to preview it here.</p>',
-        media: {
-          imageUrl: imageUrl || undefined,
-          videoUrl: videoUrl || undefined,
-          linkUrl: linkUrl || undefined,
-          linkLabel: linkLabel || undefined,
-        },
+        media,
       }),
-    [brand, subject, bodyHtml, imageUrl, videoUrl, linkUrl, linkLabel],
+    [brand, subject, bodyHtml, media],
   )
+
+  function dirty() {
+    setTested(false)
+  }
 
   async function onGenerate() {
     setBusy(true)
@@ -71,15 +104,93 @@ function EmailStudioPage() {
       if (!result.ok) throw new Error('Generate failed')
       setSubject(result.subject)
       setBodyHtml(result.html)
+      setTested(false)
       setLog(
         result.source === 'llm'
-          ? 'AI wrote this HTML template. Edit anything, then use it in a campaign.'
+          ? 'AI wrote this HTML. Send a test, then bulk to selected clients or extra emails.'
           : result.warning
-            ? `Studio fallback (${result.warning}). Add AI_API_KEY (Groq free) for full AI copy.`
-            : 'Studio built a starter template. Add AI_API_KEY (Groq free) for generated copy.',
+            ? `Studio fallback (${result.warning}). You can still send a test / bulk from here.`
+            : 'Starter template ready. Send a test, then bulk send.',
       )
     } catch (err) {
       setLog(err instanceof Error ? err.message : 'Generate failed')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  function payload(accessToken: string) {
+    return {
+      accessToken,
+      subject,
+      bodyHtml,
+      recipientMode,
+      recipientClientIds: selected,
+      extraEmails: parseExtraEmails(extraEmails),
+      testToEmail: testTo || undefined,
+      media,
+    }
+  }
+
+  async function onTest() {
+    setBusy(true)
+    setLog(null)
+    try {
+      const accessToken = await getAccessToken()
+      if (!accessToken) throw new Error('Sign in required')
+      if (!subject || !bodyHtml) throw new Error('Generate or paste a template first')
+      const result = await testSendCampaign({ data: payload(accessToken) })
+      if (!result.ok) {
+        setLog(result.error || 'Test send failed')
+        setTested(false)
+      } else {
+        setCampaignId(result.campaignId)
+        setTested(true)
+        setLog(
+          result.demo
+            ? `Test verified for ${result.testedTo} (simulated until SMTP is set). Bulk send unlocked.`
+            : `Test announcement sent to ${result.testedTo}. Bulk send unlocked.`,
+        )
+      }
+    } catch (err) {
+      setLog(err instanceof Error ? err.message : 'Test failed')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function onBulk() {
+    if (!tested) {
+      setLog('Send a test announcement first.')
+      return
+    }
+    setBusy(true)
+    setLog(null)
+    try {
+      const accessToken = await getAccessToken()
+      if (!accessToken) throw new Error('Sign in required')
+      const extras = parseExtraEmails(extraEmails)
+      if (recipientMode === 'selected' && selected.length === 0 && extras.length === 0) {
+        throw new Error('Select clients and/or add extra emails')
+      }
+      const result = await sendCampaign({
+        data: {
+          ...payload(accessToken),
+          campaignId,
+          requireTestFirst: true,
+          tested: true,
+        },
+      })
+      if (!result.ok) setLog(result.error || 'Bulk send failed')
+      else {
+        setLog(
+          result.demo
+            ? `Bulk simulated to ${result.recipientCount} address(es). Add SMTP to deliver.`
+            : `Bulk announcement sent to ${result.recipientCount} address(es).`,
+        )
+      }
+    } catch (err) {
+      setLog(err instanceof Error ? err.message : 'Send failed')
     } finally {
       setBusy(false)
     }
@@ -100,16 +211,23 @@ function EmailStudioPage() {
     navigate({ to: '/email' })
   }
 
+  function toggle(id: string) {
+    setSelected((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]))
+    dirty()
+  }
+
   if (state.status === 'loading') return <p style={{ color: 'var(--nx-muted)' }}>Loading…</p>
   if (state.status === 'error') return <div className="nx-callout">{state.message}</div>
+
+  const readyToSend = Boolean(subject && bodyHtml)
 
   return (
     <div className="nx-split">
       <div className="nx-panel nx-form-grid nx-animate-in">
         <h2 className="nx-panel-title">AI Studio</h2>
         <p className="nx-panel-muted" style={{ margin: 0 }}>
-          Describe the email. Attach an image, a video (YouTube plays as a tap-to-watch button in inboxes),
-          and a hyperlink. AI returns HTML you can edit.
+          Generate HTML, then send a test announcement and bulk mail to selected clients or extra
+          emails — without leaving Studio.
         </p>
         <div>
           <label className="nx-label" htmlFor="prompt">
@@ -149,7 +267,10 @@ function EmailStudioPage() {
             type="url"
             placeholder="https://…/photo.jpg"
             value={imageUrl}
-            onChange={(e) => setImageUrl(e.target.value)}
+            onChange={(e) => {
+              setImageUrl(e.target.value)
+              dirty()
+            }}
           />
         </div>
         <div>
@@ -162,7 +283,10 @@ function EmailStudioPage() {
             type="url"
             placeholder="https://www.youtube.com/watch?v=…"
             value={videoUrl}
-            onChange={(e) => setVideoUrl(e.target.value)}
+            onChange={(e) => {
+              setVideoUrl(e.target.value)
+              dirty()
+            }}
           />
         </div>
         <div>
@@ -174,13 +298,19 @@ function EmailStudioPage() {
             className="nx-input"
             type="url"
             value={linkUrl}
-            onChange={(e) => setLinkUrl(e.target.value)}
+            onChange={(e) => {
+              setLinkUrl(e.target.value)
+              dirty()
+            }}
           />
           <input
             className="nx-input"
             style={{ marginTop: '0.4rem' }}
             value={linkLabel}
-            onChange={(e) => setLinkLabel(e.target.value)}
+            onChange={(e) => {
+              setLinkLabel(e.target.value)
+              dirty()
+            }}
             placeholder="Button label"
           />
         </div>
@@ -192,7 +322,10 @@ function EmailStudioPage() {
             id="studioSubject"
             className="nx-input"
             value={subject}
-            onChange={(e) => setSubject(e.target.value)}
+            onChange={(e) => {
+              setSubject(e.target.value)
+              dirty()
+            }}
           />
         </div>
         <div>
@@ -202,9 +335,12 @@ function EmailStudioPage() {
           <textarea
             id="studioHtml"
             className="nx-textarea"
-            style={{ minHeight: 160, fontFamily: 'IBM Plex Mono, monospace', fontSize: '0.82rem' }}
+            style={{ minHeight: 140, fontFamily: 'IBM Plex Mono, monospace', fontSize: '0.82rem' }}
             value={bodyHtml}
-            onChange={(e) => setBodyHtml(e.target.value)}
+            onChange={(e) => {
+              setBodyHtml(e.target.value)
+              dirty()
+            }}
           />
         </div>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.55rem' }}>
@@ -214,15 +350,93 @@ function EmailStudioPage() {
             disabled={busy || prompt.trim().length < 8}
             onClick={onGenerate}
           >
-            {busy ? 'Generating…' : 'Generate with AI'}
+            {busy ? 'Working…' : 'Generate with AI'}
           </button>
+          <button className="nx-btn nx-btn-ghost" type="button" disabled={!bodyHtml} onClick={useInCampaign}>
+            Open in Campaigns
+          </button>
+        </div>
+
+        <h2 className="nx-panel-title" style={{ marginTop: '0.5rem' }}>
+          Send from Studio
+        </h2>
+        <div>
+          <label className="nx-label" htmlFor="studioTestTo">
+            1. Test announcement (known email)
+          </label>
+          <input
+            id="studioTestTo"
+            className="nx-input"
+            type="email"
+            value={testTo}
+            onChange={(e) => {
+              setTestTo(e.target.value)
+              dirty()
+            }}
+            placeholder="you@clinic.com"
+          />
+        </div>
+        <div>
+          <label className="nx-label" htmlFor="studioMode">
+            2. Bulk recipients
+          </label>
+          <select
+            id="studioMode"
+            className="nx-select"
+            value={recipientMode}
+            onChange={(e) => {
+              setRecipientMode(e.target.value as 'all' | 'selected')
+              dirty()
+            }}
+          >
+            <option value="selected">Selected clients</option>
+            <option value="all">All active clients</option>
+          </select>
+        </div>
+        {recipientMode === 'selected' && (
+          <div style={{ display: 'grid', gap: '0.35rem' }}>
+            {clients.length === 0 ? (
+              <p className="nx-panel-muted" style={{ margin: 0 }}>
+                No linked clients yet — use extra emails below.
+              </p>
+            ) : (
+              clients.map((c) => (
+                <label key={c.id} style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                  <input type="checkbox" checked={selected.includes(c.id)} onChange={() => toggle(c.id)} />
+                  {c.full_name || c.email}{' '}
+                  <span style={{ color: 'var(--nx-muted)', fontSize: '0.8rem' }}>{c.email}</span>
+                </label>
+              ))
+            )}
+          </div>
+        )}
+        <div>
+          <label className="nx-label" htmlFor="studioExtra">
+            Extra emails (optional, comma or line separated)
+          </label>
+          <textarea
+            id="studioExtra"
+            className="nx-textarea"
+            style={{ minHeight: 64 }}
+            placeholder="parent@school.edu, nurse@clinic.org"
+            value={extraEmails}
+            onChange={(e) => {
+              setExtraEmails(e.target.value)
+              dirty()
+            }}
+          />
+        </div>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.55rem' }}>
           <button
             className="nx-btn nx-btn-ghost"
             type="button"
-            disabled={!bodyHtml}
-            onClick={useInCampaign}
+            disabled={busy || !readyToSend || !testTo}
+            onClick={onTest}
           >
-            Use in campaign
+            Send test announcement
+          </button>
+          <button className="nx-btn nx-btn-primary" type="button" disabled={busy || !tested} onClick={onBulk}>
+            Bulk send
           </button>
         </div>
         {log && <p style={{ margin: 0, fontSize: '0.92rem' }}>{log}</p>}
