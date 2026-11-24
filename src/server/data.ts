@@ -25,6 +25,7 @@ import {
   insightsFromOwnerData,
   loadOwnerClients,
   loadOwnerCodes,
+  loadOwnerPremiumPurchases,
   resolveOwnerFromToken,
 } from '~/server/owner-scope'
 
@@ -80,6 +81,7 @@ export const getDashboard = createServerFn({ method: 'POST' })
       loadOwnerClients(ctx.doctor.id, data.accessToken),
       loadOwnerCodes(ctx.doctor.id, data.accessToken),
     ])
+    const premium = await loadOwnerPremiumPurchases(ctx.doctor.id, data.accessToken, clients)
     const codeCounts = new Map<string, number>()
     for (const c of codes) codeCounts.set(c.code, 0)
     for (const cl of clients) {
@@ -88,13 +90,19 @@ export const getDashboard = createServerFn({ method: 'POST' })
     }
     const codeBreakdown = [...codeCounts.entries()].map(([code, count]) => ({ code, count }))
     return {
-      insights: insightsFromOwnerData(clients, codes, {
-        assignments: blob.assignments,
-        tasks: blob.tasks,
-        topics: blob.topics,
-      }),
+      insights: insightsFromOwnerData(
+        clients,
+        codes,
+        {
+          assignments: blob.assignments,
+          tasks: blob.tasks,
+          topics: blob.topics,
+        },
+        premium.count,
+      ),
       recentClients: clients.slice(0, 8),
       codeBreakdown,
+      premium,
       audience: normalizeAudience(blob.audience),
       mode: 'supabase' as const,
       authenticated: true as const,
@@ -113,8 +121,10 @@ export const listClients = createServerFn({ method: 'POST' })
       loadWorkspace(db, ctx.doctor.id, ctx.doctor.notes),
       loadOwnerClients(ctx.doctor.id, data.accessToken),
     ])
+    const premium = await loadOwnerPremiumPurchases(ctx.doctor.id, data.accessToken, clients)
     return {
       clients,
+      premium,
       audience: normalizeAudience(blob.audience),
       authenticated: true as const,
     }
