@@ -1,6 +1,7 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { useCallback, useMemo, useState } from 'react'
 import { AppShell } from '~/components/AppShell'
+import { FeatureGate } from '~/components/FeatureGate'
 import { useOwnerQuery } from '~/components/useOwnerQuery'
 import { audienceLabels } from '~/lib/audience'
 import { getAccessToken } from '~/lib/session'
@@ -9,7 +10,11 @@ import type { AssignmentStatus, WorkSignal } from '~/lib/types'
 import { createTask, createTopic, listTasks, updateAssignment } from '~/server/data'
 
 export const Route = createFileRoute('/tasks')({
-  component: TasksPage,
+  component: () => (
+    <FeatureGate feature="tasks">
+      <TasksPage />
+    </FeatureGate>
+  ),
 })
 
 type Tab = 'assign' | 'progress'

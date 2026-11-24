@@ -1,6 +1,7 @@
 import { createServerFn } from '@tanstack/react-start'
 import { z } from 'zod'
 import { demoStore } from '~/lib/demo-data'
+import { normalizeFrontdeskFeatures } from '~/lib/frontdesk-features'
 import { hasSupabase, missingKeys } from '~/lib/env'
 import { isHostAllowed } from '~/lib/hostAllowlist'
 import { getSupabaseAdmin } from '~/lib/supabase.server'
@@ -58,6 +59,7 @@ export const getBootstrap = createServerFn({ method: 'POST' })
       ...base,
       owner: ctx.owner,
       audience: normalizeAudience(blob.audience),
+      features: normalizeFrontdeskFeatures(ctx.doctor.frontdesk_features),
       authenticated: true as const,
     }
   })

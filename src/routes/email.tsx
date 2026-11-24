@@ -1,8 +1,13 @@
 import { Link, Outlet, createFileRoute, useRouterState } from '@tanstack/react-router'
 import { AppShell } from '~/components/AppShell'
+import { FeatureGate } from '~/components/FeatureGate'
 
 export const Route = createFileRoute('/email')({
-  component: EmailLayout,
+  component: () => (
+    <FeatureGate feature="email">
+      <EmailLayout />
+    </FeatureGate>
+  ),
 })
 
 function EmailLayout() {

@@ -90,6 +90,20 @@ export const env = {
   stripeWebhookSecret: () => read('STRIPE_WEBHOOK_SECRET'),
   googleClientId: () => read('GOOGLE_CLIENT_ID') || read('VITE_GOOGLE_CLIENT_ID'),
   googleClientSecret: () => read('GOOGLE_CLIENT_SECRET'),
+  /** Back Office origin for feature-request API (no invented secrets). */
+  backOfficeUrl: () =>
+    (envSoft('VITE_BACK_OFFICE_URL') || envSoft('BACK_OFFICE_URL') || 'https://admin.notiolive.com').replace(
+      /\/$/,
+      '',
+    ),
+  /**
+   * Optional Google Form / contact URL. Only used when already configured —
+   * never invent a form URL. Soft-read so placeholders stay unused.
+   */
+  contactAdminFormUrl: () =>
+    read('CONTACT_ADMIN_FORM_URL') ||
+    read('VITE_CONTACT_ADMIN_FORM_URL') ||
+    undefined,
 }
 
 /** Keys required for authenticated owner data (anon + URL). Service role is optional server-only. */

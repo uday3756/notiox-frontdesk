@@ -14,6 +14,8 @@ export type DoctorRow = {
   country: string | null
   timezone: string | null
   notes: string | null
+  /** jsonb toggles from Back Office; missing/null keys treated as OFF. */
+  frontdesk_features?: Record<string, unknown> | null
 }
 
 /** Map NotioX doctor specialty → Front Desk role label */

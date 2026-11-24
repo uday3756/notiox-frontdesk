@@ -1,19 +1,33 @@
 import { Link, useNavigate, useRouterState } from '@tanstack/react-router'
 import { useEffect, useState, type ReactNode } from 'react'
+import { useFrontdeskFeatures } from '~/components/FeaturesProvider'
 import { audienceLabels } from '~/lib/audience'
+import type { FrontdeskFeatureKey } from '~/lib/frontdesk-features'
 import { getAccessToken, signOutOwner } from '~/lib/session'
 import { getBootstrap } from '~/server/data'
 
 const BASE_TABS = [
-  { to: '/dashboard', label: 'Home', icon: IconHome },
-  { to: '/clients', labelKey: 'people' as const, label: 'Clients', icon: IconPeople },
-  { to: '/tasks', label: 'Tasks', icon: IconTasks },
-  { to: '/offerings', label: 'Offerings', icon: IconOffer },
-  { to: '/calendar', label: 'Calendar', icon: IconCal },
-  { to: '/codes', label: 'Codes', icon: IconCode },
-  { to: '/email', label: 'Email', icon: IconMail },
-  { to: '/settings', label: 'Settings', icon: IconGear },
-] as const
+  { to: '/dashboard', label: 'Home', icon: IconHome, feature: 'dashboard' as const },
+  {
+    to: '/clients',
+    labelKey: 'people' as const,
+    label: 'Clients',
+    icon: IconPeople,
+    feature: 'clients' as const,
+  },
+  { to: '/tasks', label: 'Tasks', icon: IconTasks, feature: 'tasks' as const },
+  { to: '/offerings', label: 'Offerings', icon: IconOffer, feature: 'offerings' as const },
+  { to: '/calendar', label: 'Calendar', icon: IconCal, feature: 'calendar' as const },
+  { to: '/codes', label: 'Codes', icon: IconCode, feature: 'codes' as const },
+  { to: '/email', label: 'Email', icon: IconMail, feature: 'email' as const },
+  { to: '/settings', label: 'Settings', icon: IconGear, feature: 'settings' as const },
+] as const satisfies ReadonlyArray<{
+  to: string
+  label: string
+  icon: (props: { active: boolean }) => ReactNode
+  feature: FrontdeskFeatureKey
+  labelKey?: 'people'
+}>
 
 function tabActive(pathname: string, to: string) {
   if (to === '/dashboard') return pathname === '/dashboard' || pathname === '/'
@@ -34,6 +48,7 @@ export function AppShell({
 }) {
   const navigate = useNavigate()
   const pathname = useRouterState({ select: (s) => s.location.pathname })
+  const features = useFrontdeskFeatures()
   const [resolvedPeople, setResolvedPeople] = useState(peopleLabel || 'Clients')
 
   useEffect(() => {
@@ -82,12 +97,24 @@ export function AppShell({
           const active = tabActive(pathname, tab.to)
           const Icon = tab.icon
           const label = 'labelKey' in tab && tab.labelKey === 'people' ? resolvedPeople : tab.label
+          const locked =
+            (features.status === 'ready' || features.status === 'error') &&
+            !features.isEnabled(tab.feature)
+          const className = [
+            'nx-tab',
+            active ? 'nx-tab-active' : '',
+            locked ? 'nx-tab-locked' : '',
+          ]
+            .filter(Boolean)
+            .join(' ')
           return (
             <Link
               key={tab.to}
               to={tab.to}
-              className={active ? 'nx-tab nx-tab-active' : 'nx-tab'}
+              className={className}
               aria-current={active ? 'page' : undefined}
+              aria-label={locked ? `${label} (locked)` : label}
+              title={locked ? 'Locked — contact admin' : undefined}
             >
               <Icon active={active} />
               <span>{label}</span>

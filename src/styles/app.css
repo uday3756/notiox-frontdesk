@@ -183,6 +183,10 @@ code {
   color: var(--nx-accent-deep);
 }
 
+.nx-tab-locked {
+  opacity: 0.5;
+}
+
 /* Colorful insight tiles */
 .nx-insight {
   position: relative;
@@ -595,4 +599,92 @@ code {
   background: var(--nx-accent);
   border-color: var(--nx-accent);
   color: #fff;
+}
+
+/* ---- Feature lock (OFF toggles stay on-route, blurred) ---- */
+
+.nx-lock-wrap {
+  position: relative;
+  min-height: 22rem;
+}
+
+.nx-lock-blur {
+  filter: blur(7px);
+  opacity: 0.55;
+  pointer-events: none;
+  user-select: none;
+}
+
+.nx-lock-skeleton {
+  display: grid;
+  gap: 0.55rem;
+}
+
+.nx-lock-skeleton span {
+  display: block;
+  height: 0.85rem;
+  border-radius: 0.35rem;
+  background: linear-gradient(90deg, #e5e7eb, #f3f4f6, #e5e7eb);
+  background-size: 200% 100%;
+  animation: nx-shimmer 1.4s ease infinite;
+}
+
+.nx-lock-skeleton span:nth-child(1) {
+  width: 72%;
+}
+.nx-lock-skeleton span:nth-child(2) {
+  width: 92%;
+}
+.nx-lock-skeleton span:nth-child(3) {
+  width: 58%;
+}
+
+@keyframes nx-shimmer {
+  0% {
+    background-position: 100% 0;
+  }
+  100% {
+    background-position: -100% 0;
+  }
+}
+
+.nx-lock-overlay {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 1rem;
+}
+
+.nx-lock-card {
+  width: min(420px, 100%);
+  text-align: center;
+  background: rgba(255, 255, 255, 0.92);
+  border: 1px solid var(--nx-line);
+  border-radius: 0.75rem;
+  padding: 1.35rem 1.25rem 1.2rem;
+  box-shadow: 0 12px 40px rgba(15, 23, 42, 0.12);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+
+.nx-lock-icon {
+  display: inline-grid;
+  place-items: center;
+  width: 3rem;
+  height: 3rem;
+  margin: 0 auto 0.75rem;
+  border-radius: 999px;
+  color: var(--nx-accent-deep);
+  background: var(--nx-accent-soft);
+}
+
+.nx-lock-form {
+  text-align: left;
+}
+
+.nx-lock-form textarea.nx-input {
+  width: 100%;
+  resize: vertical;
+  min-height: 5rem;
 }
