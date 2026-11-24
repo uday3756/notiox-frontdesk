@@ -1,12 +1,17 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { useCallback, useState } from 'react'
 import { AppShell } from '~/components/AppShell'
+import { FeatureGate } from '~/components/FeatureGate'
 import { useOwnerQuery } from '~/components/useOwnerQuery'
 import { getAccessToken } from '~/lib/session'
 import { createCode, getBootstrap, listCodes } from '~/server/data'
 
 export const Route = createFileRoute('/codes')({
-  component: CodesPage,
+  component: () => (
+    <FeatureGate feature="codes">
+      <CodesPage />
+    </FeatureGate>
+  ),
 })
 
 function CodesPage() {

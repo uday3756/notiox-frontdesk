@@ -1,6 +1,7 @@
 import { createFileRoute, Link } from '@tanstack/react-router'
 import { useCallback, useState } from 'react'
 import { AppShell } from '~/components/AppShell'
+import { FeatureGate } from '~/components/FeatureGate'
 import { useOwnerQuery } from '~/components/useOwnerQuery'
 import { audienceLabels } from '~/lib/audience'
 import { getAccessToken } from '~/lib/session'
@@ -16,7 +17,11 @@ import {
 } from '~/server/catalog'
 
 export const Route = createFileRoute('/offerings')({
-  component: OfferingsPage,
+  component: () => (
+    <FeatureGate feature="offerings">
+      <OfferingsPage />
+    </FeatureGate>
+  ),
 })
 
 function OfferingsPage() {

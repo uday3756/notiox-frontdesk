@@ -6,6 +6,7 @@ import {
   HeadContent,
   Scripts,
 } from '@tanstack/react-router'
+import { FeaturesProvider } from '~/components/FeaturesProvider'
 import appCss from '../styles/app.css?url'
 
 export const Route = createRootRoute({
@@ -36,7 +37,9 @@ export const Route = createRootRoute({
 function RootComponent() {
   return (
     <RootDocument>
-      <Outlet />
+      <FeaturesProvider>
+        <Outlet />
+      </FeaturesProvider>
     </RootDocument>
   )
 }

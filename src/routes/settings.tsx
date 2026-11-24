@@ -1,6 +1,7 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { useCallback, useEffect, useState } from 'react'
 import { AppShell } from '~/components/AppShell'
+import { FeatureGate } from '~/components/FeatureGate'
 import { MissingKeysBanner } from '~/components/MissingKeysBanner'
 import { useOwnerQuery } from '~/components/useOwnerQuery'
 import { AUDIENCE_PRESET_OPTIONS, audienceLabels } from '~/lib/audience'
@@ -17,7 +18,11 @@ import {
 } from '~/server/data'
 
 export const Route = createFileRoute('/settings')({
-  component: SettingsPage,
+  component: () => (
+    <FeatureGate feature="settings">
+      <SettingsPage />
+    </FeatureGate>
+  ),
 })
 
 function SettingsPage() {

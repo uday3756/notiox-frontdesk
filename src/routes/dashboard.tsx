@@ -1,6 +1,7 @@
 import { createFileRoute, Link } from '@tanstack/react-router'
 import { useCallback } from 'react'
 import { AppShell } from '~/components/AppShell'
+import { FeatureGate } from '~/components/FeatureGate'
 import { MissingKeysBanner } from '~/components/MissingKeysBanner'
 import { useOwnerQuery } from '~/components/useOwnerQuery'
 import { audienceLabels } from '~/lib/audience'
@@ -8,7 +9,11 @@ import { ROLE_LABELS } from '~/lib/types'
 import { getBootstrap, getDashboard } from '~/server/data'
 
 export const Route = createFileRoute('/dashboard')({
-  component: DashboardPage,
+  component: () => (
+    <FeatureGate feature="dashboard">
+      <DashboardPage />
+    </FeatureGate>
+  ),
 })
 
 function DashboardPage() {
