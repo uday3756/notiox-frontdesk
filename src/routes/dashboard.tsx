@@ -5,6 +5,7 @@ import { FeatureGate } from '~/components/FeatureGate'
 import { MissingKeysBanner } from '~/components/MissingKeysBanner'
 import { useOwnerQuery } from '~/components/useOwnerQuery'
 import { audienceLabels } from '~/lib/audience'
+import { premiumPlanLabel } from '~/lib/premium'
 import { ROLE_LABELS } from '~/lib/types'
 import { getBootstrap, getDashboard } from '~/server/data'
 
@@ -44,7 +45,7 @@ function DashboardPage() {
   }
 
   const { boot, dash } = state.data
-  const { insights, codeBreakdown } = dash
+  const { insights, codeBreakdown, premium } = dash
   const people = audienceLabels(dash.audience || boot.audience)
   const clientHost = boot.notioxClientUrl.replace(/^https?:\/\//, '')
   const roleLabel = ROLE_LABELS[boot.owner.role]
@@ -124,6 +125,11 @@ function DashboardPage() {
           <em>
             {insights.completedAssignments}/{insights.totalAssignments} done
           </em>
+        </div>
+        <div className="nx-panel nx-stat nx-insight nx-insight-teal">
+          <span>Premium purchases</span>
+          <strong>{insights.premiumPurchases}</strong>
+          <em>Via your refer code</em>
         </div>
       </div>
 
@@ -247,6 +253,77 @@ function DashboardPage() {
           )}
         </section>
       </div>
+
+      <section className="nx-panel nx-animate-in" style={{ marginBottom: '1rem' }}>
+        <div
+          style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            gap: '1rem',
+            alignItems: 'baseline',
+            marginBottom: '0.35rem',
+          }}
+        >
+          <h2 className="nx-panel-title" style={{ marginBottom: 0 }}>
+            Premium purchases
+          </h2>
+          <Link
+            to="/clients"
+            style={{ color: 'var(--nx-accent-deep)', fontWeight: 650, fontSize: '0.9rem' }}
+          >
+            Open roster
+          </Link>
+        </div>
+        <p className="nx-panel-muted">
+          Users who entered <strong>your</strong> refer code, then moved freemium → premium. Any user
+          type counts; other owners’ codes do not.
+        </p>
+        {!premium?.sourceAvailable ? (
+          <p className="nx-callout" style={{ marginBottom: 0 }}>
+            {premium?.note ||
+              'Premium plan rows are not readable yet (server needs SUPABASE_SERVICE_ROLE_KEY).'}
+          </p>
+        ) : premium.count === 0 ? (
+          <p className="nx-panel-muted" style={{ marginBottom: 0 }}>
+            {premium.note || 'No premium purchases attributed to your code yet.'}
+          </p>
+        ) : (
+          <table className="nx-table">
+            <thead>
+              <tr>
+                <th>User</th>
+                <th>Plan</th>
+                <th>Code</th>
+                <th>Purchased</th>
+              </tr>
+            </thead>
+            <tbody>
+              {premium.purchases.slice(0, 8).map((p) => (
+                <tr key={p.clientId}>
+                  <td>
+                    <div style={{ fontWeight: 600 }}>{p.fullName || p.email}</div>
+                    <div style={{ fontSize: '0.85rem', color: 'var(--nx-muted)' }}>{p.email}</div>
+                  </td>
+                  <td>
+                    <span className="nx-badge nx-badge-active">{premiumPlanLabel(p.plan)}</span>
+                    {p.status ? (
+                      <div style={{ fontSize: '0.78rem', color: 'var(--nx-muted)', marginTop: 2 }}>
+                        {p.status}
+                      </div>
+                    ) : null}
+                  </td>
+                  <td>
+                    <code>{p.referralCode}</code>
+                  </td>
+                  <td style={{ whiteSpace: 'nowrap', fontSize: '0.85rem' }}>
+                    {p.purchasedAt ? new Date(p.purchasedAt).toLocaleDateString() : '—'}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </section>
 
       <section className="nx-panel nx-animate-in-delay">
         <div

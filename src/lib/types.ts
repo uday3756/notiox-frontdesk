@@ -197,6 +197,8 @@ export interface DashboardInsights {
   completedAssignments: number
   totalAssignments: number
   activeCodes: number
+  /** Users who joined via this owner’s referral code and purchased premium (any user type). */
+  premiumPurchases: number
   revenuePlaceholder: {
     mtdCents: number
     currency: string

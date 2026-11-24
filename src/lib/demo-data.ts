@@ -160,6 +160,7 @@ export function demoInsights(): DashboardInsights {
     completedAssignments: completed,
     totalAssignments: total,
     activeCodes: demoCodes.filter((c) => c.active).length,
+    premiumPurchases: 0,
     revenuePlaceholder: {
       mtdCents: 0,
       currency: 'USD',
